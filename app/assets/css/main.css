@@ -1,0 +1,50 @@
+@import 'tailwindcss';
+@import '@nuxt/ui';
+
+/* StokCeria design tokens */
+@theme {
+  --color-cream-50: #FFFBF0;
+  --color-cream-100: #FFF4D9;
+  --color-cream-200: #FFE9B3;
+  --color-cream-300: #FFDC85;
+  --color-cream-400: #FFCB52;
+  --color-cream-500: #F5B82E;
+  --color-blue-50: #F0F8FF;
+  --color-blue-100: #E1F0FA;
+  --color-blue-200: #C5E2F5;
+  --color-blue-300: #A8D5F5;
+  --color-blue-400: #7BC2EE;
+  --color-blue-500: #4FA8E0;
+  --color-blue-600: #2E8BC0;
+  --color-blue-700: #1E6E9A;
+  --color-ink-100: #E2E8F0;
+  --color-ink-300: #94A3B8;
+  --color-ink-500: #64748B;
+  --color-ink-700: #355270;
+  --color-ink-900: #1A2E44;
+  --color-green-100: #D4F1DE;
+  --color-green-500: #4CAF7A;
+  --color-green-700: #2E7D55;
+  --color-pink-100: #FCE4EC;
+  --color-pink-300: #F8BBD0;
+  --color-pink-500: #EC7AA6;
+  --font-display: 'Fredoka', sans-serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* Font-face imports via Google Fonts loaded in app.vue */
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    color: var(--color-ink-900);
+    background: linear-gradient(180deg, var(--color-cream-50) 0%, var(--color-blue-50) 60%, var(--color-blue-100) 100%) fixed;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+}
