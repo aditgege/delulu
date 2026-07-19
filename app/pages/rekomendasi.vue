@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { usePurchaseOptimizer } from '~/composables/usePurchaseOptimizer'
 import { useOrderStore } from '~/stores/orders'
+import { usePackageStore } from '~/stores/packages'
 
 definePageMeta({ title: 'Rekomendasi Pembelian' })
 
