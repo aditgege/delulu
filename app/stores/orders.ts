@@ -79,7 +79,7 @@ export const useOrderStore = defineStore('orders', () => {
     return linesBakarKukus.value
       .filter(l => l.caraMasak === 'bakar')
       .reduce((s, l) => {
-        const mcm = pkgStore.getMenuCaraMasak(l.menuId)
+        const mcm = pkgStore.getMenuCaraMasak(l.menuId, 'bakar')
         return s + l.jumlahPorsi * (mcm?.hargaPorsi ?? 18000)
       }, 0)
   }
@@ -89,7 +89,7 @@ export const useOrderStore = defineStore('orders', () => {
     return linesBakarKukus.value
       .filter(l => l.caraMasak === 'kukus')
       .reduce((s, l) => {
-        const mcm = pkgStore.getMenuCaraMasak(l.menuId)
+        const mcm = pkgStore.getMenuCaraMasak(l.menuId, 'kukus')
         return s + l.jumlahPorsi * (mcm?.hargaPorsi ?? 16000)
       }, 0)
   }

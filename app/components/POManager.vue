@@ -23,7 +23,8 @@ const deletingPo = ref(false)
 
 onMounted(async () => {
   await poStore.ensureLoaded()
-  pkgStore.ensureLoaded()
+  await pkgStore.ensureLoaded()
+  await pkgStore.ensureCaraMasakLoaded()
   const active = poStore.getActiveOrders()
   if (active.length > 0) selectedPoId.value = active[0]!.id
   initialLoading.value = false
@@ -220,7 +221,7 @@ function getPackageById(id: string) {
 }
 
 function getHargaPorsi(menuId: string, caraMasak: string): number {
-  return pkgStore.getMenuCaraMasak(menuId)?.hargaPorsi ?? (caraMasak === 'bakar' ? 18000 : 16000)
+  return pkgStore.getMenuCaraMasak(menuId, caraMasak)?.hargaPorsi ?? (caraMasak === 'bakar' ? 18000 : 16000)
 }
 
 // ── Invoice preview computed ──
@@ -558,11 +559,12 @@ function totalExtraChili(): number {
                 class="flex items-center gap-1.5 rounded-lg px-2 py-1.5"
                 :style="{ background: item.caraMasak === 'bakar' ? 'var(--color-orange-50)' : 'var(--color-blue-50)' }"
               >
-                <span class="text-xs font-semibold flex-1" style="color: var(--color-ink-800);">{{ item.menuId }}</span>
-                <span class="text-[10px] font-bold rounded-full px-1.5 py-0.5" :style="{
+                <span class="text-xs font-semibold flex-1 truncate" style="color: var(--color-ink-800);">{{ pkgStore.getMenuById(item.menuId)?.name || item.menuId }}</span>
+                <span class="text-[10px] font-bold rounded-full px-1.5 py-0.5 shrink-0" :style="{
                   background: item.caraMasak === 'bakar' ? 'var(--color-orange-100)' : 'var(--color-blue-100)',
                   color: item.caraMasak === 'bakar' ? '#B45309' : '#2563EB'
                 }">{{ item.caraMasak === 'bakar' ? 'Bakar' : 'Kukus' }}</span>
+                <span class="text-[10px] font-semibold shrink-0" style="color: var(--color-ink-500);">@{{ (getHargaPorsi(item.menuId, item.caraMasak) / 1000).toFixed(0) }}K</span>
                   <button class="flex h-6 w-6 items-center justify-center rounded-md border text-xs font-bold active:scale-90 disabled:opacity-30"
                     :disabled="savingOrder[customer.id]"
                     style="border-color: #ddd; color: #666; background: white;"
@@ -574,7 +576,7 @@ function totalExtraChili(): number {
                     :disabled="savingOrder[customer.id]"
                     :style="{ background: item.caraMasak === 'bakar' ? 'var(--color-orange-500)' : 'var(--color-blue-500)' }"
                   @click="setBakarKukusPorsi(customer, item.menuId, item.caraMasak, item.jumlahPorsi + 1)">+</button>
-                <span class="text-[10px] font-semibold w-14 text-right" style="color: var(--color-ink-500);">
+                <span class="text-[10px] font-semibold w-14 text-right shrink-0" style="color: var(--color-ink-500);">
                   Rp{{ (item.jumlahPorsi * getHargaPorsi(item.menuId, item.caraMasak)).toLocaleString() }}
                 </span>
               </div>

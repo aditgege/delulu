@@ -59,7 +59,7 @@ const emojiMap: Record<string, string> = {
 }
 function e(id: string) { return emojiMap[id] || '📦' }
 function hargaPorsi(menuId: string, cm: string): number {
-  return pkgStore.getMenuCaraMasak(menuId)?.hargaPorsi ?? (cm === 'bakar' ? 18000 : 16000)
+  return pkgStore.getMenuCaraMasak(menuId, cm)?.hargaPorsi ?? (cm === 'bakar' ? 18000 : 16000)
 }
 
 const activeOrderCount = computed(() => orderStore.getOrderLines().filter(l => l.qty > 0).length)

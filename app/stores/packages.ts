@@ -105,14 +105,15 @@ export const usePackageStore = defineStore('packages', () => {
     return caraMasaks.value
   }
 
-  function getMenuCaraMasak(menuId: string): import('~/types').MenuCaraMasak | undefined {
+  function getMenuCaraMasak(menuId: string, caraMasakId?: string): import('~/types').MenuCaraMasak | undefined {
     ensureCaraMasakLoaded()
+    if (caraMasakId) return menuCaraMasaks.value.find(m => m.menuId === menuId && m.caraMasakId === caraMasakId)
     return menuCaraMasaks.value.find(m => m.menuId === menuId)
   }
 
   return {
     packages, menus, supplierPacks, mixes, loaded,
-    ensureLoaded,
+    ensureLoaded, ensureCaraMasakLoaded,
     getPackageById, getAllPackages, getMenuById, getSupplierPack,
     getAllMenus, getAllSupplierPacks, getAllMixes, getMixById,
     addPackage, updatePackage, removePackage, resetToSeed,

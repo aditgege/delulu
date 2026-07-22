@@ -176,7 +176,7 @@ export const usePoStore = defineStore('po', () => {
     }
     for (const item of (customer.bakarKukusItems ?? [])) {
       if (item.caraMasak === 'bakar' || item.caraMasak === 'kukus') {
-        const mcm = pkgStore.getMenuCaraMasak(item.menuId)
+        const mcm = pkgStore.getMenuCaraMasak(item.menuId, item.caraMasak)
         total += item.jumlahPorsi * (mcm?.hargaPorsi ?? (item.caraMasak === 'bakar' ? 18000 : 16000))
       }
     }
