@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { usePackageStore } from '~/stores/packages'
-import type { PurchaseOrder, CustomerOrder } from '~/types'
+import type { PurchaseOrder, CustomerOrder, CustomerBakarKukusItem } from '~/types'
 
 function nextId(): string {
   return `po_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
@@ -22,6 +22,7 @@ export const usePoStore = defineStore('po', () => {
         customers: detail.customers.map((c: any) => ({
           id: c.id,
           name: c.name,
+          shippingFee: c.shippingFee ?? 0,
           paid: c.paid,
           shipped: c.shipped,
           items: c.items.map((i: any) => ({
@@ -29,6 +30,11 @@ export const usePoStore = defineStore('po', () => {
             qty: i.qty,
             extraChiliOil: i.extraChiliOil || 0,
           })),
+          bakarKukusItems: (c as any).bakarKukusItems?.map((i: any) => ({
+            menuId: i.menuId,
+            caraMasak: i.caraMasak,
+            jumlahPorsi: i.jumlahPorsi,
+          })) || [],
         })),
         createdAt: detail.order.created_at,
         closed: detail.order.closed,
@@ -62,7 +68,7 @@ export const usePoStore = defineStore('po', () => {
     if (!po) return null
     const customer: CustomerOrder = {
       id: nextId(), name,
-      items: [], paid: false, shipped: false,
+      items: [], bakarKukusItems: [], shippingFee: 0, paid: false, shipped: false,
     }
     await $fetch(`/api/orders/${poId}/customers`, {
       method: 'POST',
@@ -117,6 +123,21 @@ export const usePoStore = defineStore('po', () => {
     )
   }
 
+  async function setShippingFee(poId: string, customerId: string, shippingFee: number) {
+    const valid = Math.max(0, Math.floor(shippingFee))
+    await $fetch(`/api/orders/${poId}/customers/${customerId}/shipping-fee`, {
+      method: 'PUT',
+      body: { shippingFee: valid },
+    })
+    orders.value = orders.value.map(o =>
+      o.id === poId
+        ? { ...o, customers: o.customers.map(c =>
+            c.id === customerId ? { ...c, shippingFee: valid } : c
+          )}
+        : o,
+    )
+  }
+
   async function togglePaid(poId: string, customerId: string) {
     await $fetch(`/api/orders/${poId}/customers/${customerId}/toggle`, {
       method: 'PUT',
@@ -153,6 +174,13 @@ export const usePoStore = defineStore('po', () => {
       if (pkg?.price) total += pkg.price * item.qty
       if (item.extraChiliOil) total += 2000 * item.extraChiliOil
     }
+    for (const item of (customer.bakarKukusItems ?? [])) {
+      if (item.caraMasak === 'bakar' || item.caraMasak === 'kukus') {
+        const mcm = pkgStore.getMenuCaraMasak(item.menuId)
+        total += item.jumlahPorsi * (mcm?.hargaPorsi ?? (item.caraMasak === 'bakar' ? 18000 : 16000))
+      }
+    }
+    total += customer.shippingFee ?? 0
     return total
   }
 
@@ -195,14 +223,24 @@ export const usePoStore = defineStore('po', () => {
     )
   }
 
+  function totalBakarKukusPorsiSold(): number {
+    return getClosedOrders().reduce((s, o) =>
+      s + o.customers.reduce((sc, c) =>
+        sc + (c.bakarKukusItems ?? []).reduce((si, i) => si + i.jumlahPorsi, 0), 0
+      ), 0
+    )
+  }
+
   return {
     orders, loaded,
     ensureLoaded,
     getActiveOrders, getOrderById,
     createOrder, closeOrder, deleteOrder,
     addCustomer, removeCustomer,
-    setCustomerItem, togglePaid, toggleShipped,
+    setCustomerItem, setShippingFee, togglePaid, toggleShipped,
     customerTotal, orderTotal,
-    getClosedOrders, totalRevenue, totalCustomers, totalPackagesSold,
+    getClosedOrders, totalRevenue, totalCustomers, totalPackagesSold, totalBakarKukusPorsiSold,
   }
 })
+
+

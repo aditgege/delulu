@@ -29,6 +29,7 @@
         <NuxtPage />
       </main>
 
+
       <!-- Bottom Nav -->
       <nav
         class="fixed bottom-0 left-1/2 z-50 w-full max-w-lg -translate-x-1/2 border-t px-2 py-1.5"
@@ -56,15 +57,13 @@ const route = useRoute()
 
 const tabs = [
   { id: 'order', label: 'Pesanan', emoji: '🛒', to: '/' },
-  { id: 'results', label: 'Hasil', emoji: '📊', to: '/rekomendasi' },
-  { id: 'manage', label: 'Stok & Atur', emoji: '⚙️', to: '/kelola-paket' },
+  { id: 'manage', label: 'Stok & Atur', emoji: '⚙️', to: '/settings' },
 ]
 
 const currentTab = computed(() => {
   const path = route.path
   if (path === '/') return 'order'
-  if (path === '/rekomendasi') return 'results'
-  return 'manage'
+  if (path.startsWith('/settings')) return 'manage'
 })
 
 const todayStr = new Date().toLocaleDateString('id-ID', {

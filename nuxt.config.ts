@@ -39,7 +39,7 @@ export default defineNuxtConfig({
     },
     workbox: {
       navigateFallback: '/',
-      globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
+      globPatterns: ['**/*.{html,js,css,png,svg,ico,woff,woff2,json}'],
       runtimeCaching: [
         {
           urlPattern: /^https?:\/\/.*\/api\/.*/i,
@@ -58,8 +58,7 @@ export default defineNuxtConfig({
       installPrompt: true,
     },
     devOptions: {
-      enabled: true,
-      type: 'module',
+      enabled: false,
     },
   },
 

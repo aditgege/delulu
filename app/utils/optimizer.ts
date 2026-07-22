@@ -1,43 +1,44 @@
 import type {
-  OrderLine, Package, SKU, InventoryEntry, SupplierPack, SupplierMix,
-  SkuNeed, PackOption, SkuRecommendation, PurchaseRecommendation,
-  MixOption, MixSkuRecommendation, MixRecommendation,
+  OrderLine, BakarKukusLine, Package, Menu, InventoryEntry, SupplierPack, SupplierMix,
+  MenuNeed, PackOption, MenuRecommendation, PurchaseRecommendation,
+  MixOption, MixMenuRecommendation, MixRecommendation,
 } from '~/types'
+import { PORSI_PCS } from '~/types'
 
 // ——— Mix Paket Optimization ———
 
 /**
- * Find optimal combination of Mix Pakets (A, B, C, E) to cover per-SKU needs.
+ * Find optimal combination of Mix Pakets (A, B, C, E) to cover per-Menu needs.
  *
  * Brute-force over 4 variables. For each mix, bound = ceil(maxNeed / 6).
  * With realistic needs < 200 pcs, max ≈ 34 per mix → 34⁴ ≈ 1.3M iterations.
  */
 export function optimizeMixes(
-  needs: SkuNeed[],
+  needs: MenuNeed[],
   mixes: SupplierMix[],
 ): MixOption | null {
-  // Build per-SKU net need map
-  const needMap = new Map(needs.filter(n => n.netNeed > 0).map(n => [n.skuId, n.netNeed]))
+  // Build per-Menu net need map
+  const needMap = new Map(needs.filter(n => n.netNeed > 0).map(n => [n.menuId, n.netNeed]))
 
-  // Build mix "contents" matrix: for each mix, what it provides per SKU
+  // Build mix "contents" matrix: for each mix, what it provides per Menu
   const mixIds = mixes.map(m => m.id)
   const mixData = mixes.map(m => {
-    const prov = new Map(m.contents.map(c => [c.skuId, c.qty]))
+    const prov = new Map(m.contents.map(c => [c.menuId, c.qty]))
     return { id: m.id, price: m.price, prov }
   })
 
-  // Determine which SKUs are covered by at least one mix
-  const coveredSkus = new Set<string>()
+  // Determine which Menus are covered by at least one mix
+  const coveredMenus = new Set<string>()
   for (const mix of mixes) {
-    for (const c of mix.contents) coveredSkus.add(c.skuId)
+    for (const c of mix.contents) coveredMenus.add(c.menuId)
   }
 
-  // Only optimize SKUs that are both needed AND covered by mixes
-  const relevantSkus = [...coveredSkus].filter(s => needMap.has(s))
-  if (relevantSkus.length === 0) return null
+  // Only optimize Menus that are both needed AND covered by mixes
+  const relevantMenus = [...coveredMenus].filter(s => needMap.has(s))
+  if (relevantMenus.length === 0) return null
 
-  // Bound: max of each mix = ceil(max need for any relevant SKU / 6)
-  const maxNeed = Math.max(...relevantSkus.map(s => needMap.get(s)!))
+  // Bound: max of each mix = ceil(max need for any relevant Menu / 6)
+  const maxNeed = Math.max(...relevantMenus.map(s => needMap.get(s)!))
   const maxPerMix = Math.ceil(maxNeed / 6)
 
   // Performance guard: cap at 100 per mix to prevent browser freeze
@@ -45,14 +46,13 @@ export function optimizeMixes(
   if (bound < maxPerMix) {
     console.warn(
       `[optimizer] mix search truncated at ${bound} per mix (need ${maxPerMix}). ` +
-      `Result may under-purchase for orders >${bound * 6} pcs per SKU.`
+      `Result may under-purchase for orders >${bound * 6} pcs per Menu.`
     )
   }
 
   let best: MixOption | null = null
   const counts: Record<string, number> = Object.fromEntries(mixes.map(m => [m.id, 0]))
 
-  // Iterate — dynamically iterate over all mixes
   for (let a = 0; a <= bound; a++) {
     counts[mixIds[0]!] = a
     for (let b = 0; b <= (mixIds[1] ? bound : 0); b++) {
@@ -62,7 +62,6 @@ export function optimizeMixes(
         for (let e = 0; e <= (mixIds[3] ? bound : 0); e++) {
           if (mixIds[3]) counts[mixIds[3]!] = e
 
-          // Compute per-SKU provided
           const provided = new Map<string, number>()
           let totalUnits = 0
           let totalCost = 0
@@ -70,27 +69,26 @@ export function optimizeMixes(
           for (const mix of mixData) {
             const cnt = counts[mix.id] ?? 0
             if (cnt === 0) continue
-            for (const [skuId, qty] of mix.prov) {
-              provided.set(skuId, (provided.get(skuId) || 0) + qty * cnt)
+            for (const [menuId, qty] of mix.prov) {
+              provided.set(menuId, (provided.get(menuId) || 0) + qty * cnt)
             }
-            totalUnits += cnt * 30 // each mix is 30 pcs
+            totalUnits += cnt * 30
             totalCost += cnt * mix.price
           }
 
-          // Check all relevant SKUs are covered
           let allCovered = true
-          const wastePerSku: Record<string, number> = {}
+          const wastePerMenu: Record<string, number> = {}
           let totalWaste = 0
 
-          for (const sku of relevantSkus) {
-            const need = needMap.get(sku)!
-            const prov = provided.get(sku) || 0
+          for (const menu of relevantMenus) {
+            const need = needMap.get(menu)!
+            const prov = provided.get(menu) || 0
             if (prov < need) {
               allCovered = false
               break
             }
             const waste = prov - need
-            wastePerSku[sku] = waste
+            wastePerMenu[menu] = waste
             totalWaste += waste
           }
 
@@ -101,7 +99,7 @@ export function optimizeMixes(
             totalWaste < best.totalWaste ||
             (totalWaste === best.totalWaste && totalCost < best.totalCost)
           ) {
-            best = { counts: { ...counts }, totalUnits, totalCost, wastePerSku, totalWaste }
+            best = { counts: { ...counts }, totalUnits, totalCost, wastePerSku: wastePerMenu, totalWaste }
           }
         }
       }
@@ -115,14 +113,13 @@ export function optimizeMixes(
  * Build Mix recommendation details from a MixOption.
  */
 export function buildMixRecommendation(
-  needs: SkuNeed[],
+  needs: MenuNeed[],
   mixes: SupplierMix[],
   mixOption: MixOption,
   packages: Package[],
 ): MixRecommendation {
-  const needMap = new Map(needs.map(n => [n.skuId, n]))
+  const needMap = new Map(needs.map(n => [n.menuId, n]))
 
-  // Which mixes to buy
   const mixList = mixes
     .filter(m => (mixOption.counts[m.id] || 0) > 0)
     .map(m => ({
@@ -132,15 +129,13 @@ export function buildMixRecommendation(
       qty: mixOption.counts[m.id] || 0,
     }))
 
-  // Per-SKU detail
-  const skuDetails: MixSkuRecommendation[] = []
-  for (const [skuId, waste] of Object.entries(mixOption.wastePerSku)) {
-    const need = needMap.get(skuId)
+  const menuDetails: MixMenuRecommendation[] = []
+  for (const [menuId, waste] of Object.entries(mixOption.wastePerSku)) {
+    const need = needMap.get(menuId)
     if (!need || need.netNeed <= 0) continue
-    // Compute provided = need + waste
-    skuDetails.push({
-      skuId,
-      skuName: need.skuName,
+    menuDetails.push({
+      menuId,
+      menuName: need.menuName,
       netNeed: need.netNeed,
       provided: need.netNeed + waste,
       waste,
@@ -151,7 +146,7 @@ export function buildMixRecommendation(
 
   return {
     mixes: mixList,
-    skuDetails,
+    skuDetails: menuDetails,
     wasteBonus,
     totalCost: mixOption.totalCost,
     totalWaste: mixOption.totalWaste,
@@ -161,19 +156,11 @@ export function buildMixRecommendation(
 // ——— Waste-to-Packages Optimization ———
 
 export interface WastePackageResult {
-  /** How many of each package can be assembled from waste */
   counts: Record<string, number>
-  /** Remaining waste after assembling those packages */
   remainingWaste: number
-  /** Total packages assembled */
   totalPackages: number
 }
 
-/**
- * Given leftover pieces from Mix purchases, find how many retail packages
- * can be assembled from waste. Dynamic — supports any number of packages.
- * Brute-force with depth = package count, each bounded by max 20.
- */
 export function optimizeWasteToPackages(
   wastePerSku: Record<string, number>,
   packages: Package[],
@@ -187,11 +174,10 @@ export function optimizeWasteToPackages(
   const startWaste = Object.values(wastePerSku).reduce((s, n) => s + n, 0)
   if (startWaste === 0) return null
 
-  // Compute max per package (cap at 20 to keep brute-force bounded)
   const maxPerPkg = pkgs.map(pkg => {
     let max = Infinity
     for (const b of pkg.bom) {
-      const avail = wastePerSku[b.skuId] || 0
+      const avail = wastePerSku[b.menuId] || 0
       const canMake = Math.floor(avail / b.qty)
       if (canMake < max) max = canMake
     }
@@ -200,7 +186,6 @@ export function optimizeWasteToPackages(
 
   let best: WastePackageResult | null = null
 
-  // Recursive brute-force over N packages
   function recurse(index: number, counts: Record<string, number>, remaining: Record<string, number>): void {
     if (index >= maxPerPkg.length) {
       const remainingTotal = Object.values(remaining).reduce((s, n) => s + n, 0)
@@ -217,22 +202,19 @@ export function optimizeWasteToPackages(
 
     const pkg = maxPerPkg[index]!
     for (let n = 0; n <= pkg.max; n++) {
-      // Apply this package n times
       const newRemaining = { ...remaining }
       const pkgDef = pkgs.find(p => p.id === pkg.id)
       if (pkgDef) {
         for (const b of pkgDef.bom) {
-          newRemaining[b.skuId] = (newRemaining[b.skuId] || 0) - n * b.qty
+          newRemaining[b.menuId] = (newRemaining[b.menuId] || 0) - n * b.qty
         }
       }
-      // If any negative, skip
       let valid = true
       for (const v of Object.values(newRemaining)) {
         if (v < 0) { valid = false; break }
       }
       if (!valid) continue
 
-      // Prune: if remaining >= best.remaining and totalPkgs <= best, skip
       const remainingTotal = Object.values(newRemaining).reduce((s, n) => s + n, 0)
       const currentPkgs = Object.values(counts).reduce((s, n) => s + n, 0) + n
       if (best && remainingTotal >= best.remainingWaste && currentPkgs <= best.totalPackages) continue
@@ -247,7 +229,7 @@ export function optimizeWasteToPackages(
   return best
 }
 
-// ——— Individual Pack Optimization (original, for non-Mix SKUs) ———
+// ——— Individual Pack Optimization ———
 
 export function findOptimalPacks(
   need: number,
@@ -274,24 +256,24 @@ export function findOptimalPacks(
   return best
 }
 
-export function buildSingleSkuRecommendations(
-  needs: SkuNeed[],
+export function buildMenuRecommendations(
+  needs: MenuNeed[],
   supplierPacks: SupplierPack[],
-  skipSkus: Set<string>,
-): SkuRecommendation[] {
+  skipMenus: Set<string>,
+): MenuRecommendation[] {
   const packMap = new Map<string, SupplierPack[]>()
   for (const pack of supplierPacks) {
-    if (!packMap.has(pack.skuId)) packMap.set(pack.skuId, [])
-    packMap.get(pack.skuId)!.push(pack)
+    if (!packMap.has(pack.menuId)) packMap.set(pack.menuId, [])
+    packMap.get(pack.menuId)!.push(pack)
   }
 
-  const recommendations: SkuRecommendation[] = []
+  const recommendations: MenuRecommendation[] = []
 
   for (const need of needs) {
     if (need.netNeed <= 0) continue
-    if (skipSkus.has(need.skuId)) continue // handled by Mixes
+    if (skipMenus.has(need.menuId)) continue
 
-    const packs = packMap.get(need.skuId)
+    const packs = packMap.get(need.menuId)
     if (!packs || packs.length === 0) continue
 
     let chosen: PackOption | null = null
@@ -318,45 +300,47 @@ export function buildSingleSkuRecommendations(
     }
 
     if (chosen) {
-      recommendations.push({
-        skuId: need.skuId,
-        skuName: need.skuName,
-        netNeed: need.netNeed,
-        chosenPack: chosen,
-      })
+      recommendations.push({ menuId: need.menuId, menuName: need.menuName, netNeed: need.netNeed, chosenPack: chosen })
     }
   }
 
   return recommendations
 }
 
-// ——— Per-SKU Need Computation ———
+// ——— Per-Menu Need Computation ———
 
 export function computeNeeds(
   orderLines: OrderLine[],
+  bakarKukusLines: BakarKukusLine[],
   packages: Package[],
-  skus: SKU[],
+  menus: Menu[],
   inventory: InventoryEntry[],
-): SkuNeed[] {
-  const invMap = new Map(inventory.map(i => [i.skuId, i.qtyOnHand]))
+): MenuNeed[] {
+  const invMap = new Map(inventory.map(i => [i.menuId, i.qtyOnHand]))
   const pkgMap = new Map(packages.map(p => [p.id, p]))
-  const skuMap = new Map(skus.map(s => [s.id, s]))
+  const menuMap = new Map(menus.map(s => [s.id, s]))
 
   const grossMap = new Map<string, number>()
   for (const line of orderLines) {
     const pkg = pkgMap.get(line.packageId)
     if (!pkg) continue
     for (const bom of pkg.bom) {
-      grossMap.set(bom.skuId, (grossMap.get(bom.skuId) || 0) + bom.qty * line.qty)
+      grossMap.set(bom.menuId, (grossMap.get(bom.menuId) || 0) + bom.qty * line.qty)
     }
   }
 
-  const needs: SkuNeed[] = []
-  for (const sku of skus) {
-    const grossNeed = grossMap.get(sku.id) || 0
-    const stockOnHand = invMap.get(sku.id) || 0
+  for (const line of bakarKukusLines) {
+    const menuId = line.menuId
+    const pcsNeed = line.jumlahPorsi * PORSI_PCS
+    grossMap.set(menuId, (grossMap.get(menuId) || 0) + pcsNeed)
+  }
+
+  const needs: MenuNeed[] = []
+  for (const menu of menus) {
+    const grossNeed = grossMap.get(menu.id) || 0
+    const stockOnHand = invMap.get(menu.id) || 0
     const netNeed = Math.max(0, grossNeed - stockOnHand)
-    needs.push({ skuId: sku.id, skuName: sku.name, grossNeed, stockOnHand, netNeed })
+    needs.push({ menuId: menu.id, menuName: menu.name, grossNeed, stockOnHand, netNeed })
   }
   return needs
 }
@@ -365,32 +349,29 @@ export function computeNeeds(
 
 export function computeFullRecommendation(
   orderLines: OrderLine[],
+  bakarKukusLines: BakarKukusLine[],
   packages: Package[],
-  skus: SKU[],
+  menus: Menu[],
   inventory: InventoryEntry[],
   supplierPacks: SupplierPack[],
   mixes: SupplierMix[],
 ): PurchaseRecommendation {
-  const needs = computeNeeds(orderLines, packages, skus, inventory)
+  const needs = computeNeeds(orderLines, bakarKukusLines, packages, menus, inventory)
 
-  // Which SKUs are covered by Mixes?
-  const mixCoveredSkus = new Set<string>()
+  const mixCoveredMenus = new Set<string>()
   for (const mix of mixes) {
-    for (const c of mix.contents) mixCoveredSkus.add(c.skuId)
+    for (const c of mix.contents) mixCoveredMenus.add(c.menuId)
   }
 
-  // 1. Mix optimization
   const mixOption = optimizeMixes(needs, mixes)
   let mixRecommendation: MixRecommendation | null = null
   if (mixOption) {
     mixRecommendation = buildMixRecommendation(needs, mixes, mixOption, packages)
   } else {
-    // If optimizer fails (cap truncation), don't block individual packs for mix-covered SKUs
-    mixCoveredSkus.clear()
+    mixCoveredMenus.clear()
   }
 
-  // 2. Individual packs for non-Mix SKUs
-  const individualRecommendations = buildSingleSkuRecommendations(needs, supplierPacks, mixCoveredSkus)
+  const individualRecommendations = buildMenuRecommendations(needs, supplierPacks, mixCoveredMenus)
 
   const grandTotalCost =
     (mixRecommendation?.totalCost || 0) +

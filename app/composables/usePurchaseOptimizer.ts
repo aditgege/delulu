@@ -1,7 +1,7 @@
 import { usePackageStore } from '~/stores/packages'
 import { useInventoryStore } from '~/stores/inventory'
 import { useOrderStore } from '~/stores/orders'
-import type { PurchaseRecommendation } from '~/types'
+import type { PurchaseRecommendation, BakarKukusLine } from '~/types'
 
 export function usePurchaseOptimizer(): {
   result: Ref<PurchaseRecommendation | null>
@@ -23,20 +23,21 @@ export function usePurchaseOptimizer(): {
 
     try {
       const orderLines = orderStore.getOrderLines()
+      const bakarKukusLines = orderStore.getBakarKukusLines()
       const packages = pkgStore.getAllPackages()
-      const skus = pkgStore.getAllSkus()
+      const skus = pkgStore.getAllMenus()
       const inventory = invStore.getAllEntries()
       const supplierPacks = pkgStore.getAllSupplierPacks()
       const mixes = pkgStore.getAllMixes()
 
-      if (orderLines.length === 0) {
+      if (orderLines.length === 0 && bakarKukusLines.length === 0) {
         error.value = 'Belum ada pesanan. Silakan isi pesanan terlebih dahulu.'
         loading.value = false
         return
       }
 
       result.value = computeFullRecommendation(
-        orderLines, packages, skus, inventory, supplierPacks, mixes,
+        orderLines, bakarKukusLines, packages, skus, inventory, supplierPacks, mixes,
       )
     } catch (e) {
       error.value = `Terjadi kesalahan: ${e instanceof Error ? e.message : 'Unknown error'}`
@@ -44,6 +45,19 @@ export function usePurchaseOptimizer(): {
       loading.value = false
     }
   }
+
+  // Auto-recompute when orders or inventory change
+  watch(
+    () => [
+      orderStore.getOrderLines(),
+      orderStore.getBakarKukusLines(),
+      invStore.getAllEntries(),
+      pkgStore.getAllMenus(),
+      pkgStore.getAllPackages(),
+    ],
+    () => { compute() },
+    { deep: true },
+  )
 
   return { result, loading, error, compute }
 }

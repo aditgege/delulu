@@ -1,39 +1,39 @@
 import { describe, it, expect } from 'vitest'
 import { findOptimalPacks, optimizeWasteToPackages, optimizeMixes, computeNeeds } from './optimizer'
-import type { Package, SupplierMix, SKU, InventoryEntry, OrderLine } from '~/types'
+import type { Package, SupplierMix, Menu, InventoryEntry, OrderLine } from '~/types'
 
 const PACKAGES: Package[] = [
   {
     id: 'paket-halu',
     name: 'Paket Halu',
     bom: [
-      { skuId: 'siomay-ayam', qty: 1 },
-      { skuId: 'lumpia-tahu-udang', qty: 1 },
-      { skuId: 'siomay-nori', qty: 1 },
-      { skuId: 'siomay-kepiting', qty: 1 },
-      { skuId: 'shisitkau', qty: 1 },
+      { menuId: 'siomay-ayam', qty: 2 },
+      { menuId: 'lumpia-kulit-tahu-udang', qty: 2 },
+      { menuId: 'siomay-nori', qty: 2 },
+      { menuId: 'siomay-kepiting', qty: 2 },
+      { menuId: 'hisitkau', qty: 2 },
     ],
   },
   {
     id: 'paket-when-ya',
     name: 'Paket When Ya',
     bom: [
-      { skuId: 'siomay-udang', qty: 1 },
-      { skuId: 'lumpia-tahu-ayam', qty: 1 },
-      { skuId: 'siomay-nori', qty: 1 },
-      { skuId: 'siomay-seafood', qty: 1 },
-      { skuId: 'shisitkau', qty: 1 },
+      { menuId: 'siomay-udang', qty: 2 },
+      { menuId: 'lumpia-kulit-tahu-ayam', qty: 2 },
+      { menuId: 'siomay-nori', qty: 2 },
+      { menuId: 'siomay-seafood', qty: 2 },
+      { menuId: 'hisitkau', qty: 2 },
     ],
   },
   {
     id: 'paket-solulu',
     name: 'Paket Solulu',
     bom: [
-      { skuId: 'siomay-ayam', qty: 1 },
-      { skuId: 'lumpia-tahu-ayam', qty: 1 },
-      { skuId: 'siomay-nori', qty: 1 },
-      { skuId: 'siomay-kepiting', qty: 1 },
-      { skuId: 'siomay-mozzarella', qty: 1 },
+      { menuId: 'siomay-ayam', qty: 2 },
+      { menuId: 'lumpia-kulit-tahu-ayam', qty: 2 },
+      { menuId: 'siomay-nori', qty: 2 },
+      { menuId: 'siomay-kepiting', qty: 2 },
+      { menuId: 'siomay-mozzarella', qty: 2 },
     ],
   },
 ]
@@ -63,12 +63,12 @@ describe('optimizeWasteToPackages', () => {
   it('enough waste makes multiple packages', () => {
     const waste = {
       'siomay-ayam': 10,
-      'lumpia-tahu-udang': 5,
+      'lumpia-kulit-tahu-udang': 5,
       'siomay-nori': 15,
       'siomay-kepiting': 10,
-      'shisitkau': 10,
+      'hisitkau': 10,
       'siomay-udang': 5,
-      'lumpia-tahu-ayam': 10,
+      'lumpia-kulit-tahu-ayam': 10,
       'siomay-seafood': 5,
       'siomay-mozzarella': 5,
     }
@@ -93,8 +93,8 @@ describe('optimizeWasteToPackages', () => {
       id: 'paket-test',
       name: 'Paket Test',
       bom: [
-        { skuId: 'siomay-ayam', qty: 2 },
-        { skuId: 'siomay-nori', qty: 2 },
+        { menuId: 'siomay-ayam', qty: 2 },
+        { menuId: 'siomay-nori', qty: 2 },
       ],
     }
     const waste = { 'siomay-ayam': 10, 'siomay-nori': 10 }
@@ -111,19 +111,19 @@ describe('optimizeMixes — adversarial bug tests', () => {
     id: 'mix-a',
     name: 'Mix A',
     price: 64000,
-    contents: [{ skuId: 'siomay-ayam', qty: 6 }],
+    contents: [{ menuId: 'siomay-ayam', qty: 6 }],
   }
 
   const MIX_Z: SupplierMix = {
     id: 'mix-z',
     name: 'Mix Z',
     price: 64000,
-    contents: [{ skuId: 'siomay-test', qty: 6 }],
+    contents: [{ menuId: 'siomay-test', qty: 6 }],
   }
 
   it('returns null for need >300 due to cap-50 (RED — bug #1)', () => {
-    // 1 SKU need=400 → maxPerMix = ceil(400/6) = 67, capped at 50 → 300 pcs < 400
-    const needs = [{ skuId: 'siomay-ayam', skuName: 'Siomay Ayam', grossNeed: 400, stockOnHand: 0, netNeed: 400 }]
+    // 1 Menu need=400 → maxPerMix = ceil(400/6) = 67, capped at 50 → 300 pcs < 400
+    const needs = [{ menuId: 'siomay-ayam', menuName: 'Siomay Ayam', grossNeed: 400, stockOnHand: 0, netNeed: 400 }]
     const result = optimizeMixes(needs, [MIX_A])
     // Currently returns null because cap-50 prevents finding 67 mixes
     // After fix, should return a valid solution
@@ -133,7 +133,7 @@ describe('optimizeMixes — adversarial bug tests', () => {
   })
 
   it('handles custom mix ID not in hardcoded set (RED — bug #2)', () => {
-    const needs = [{ skuId: 'siomay-test', skuName: 'Siomay Test', grossNeed: 60, stockOnHand: 0, netNeed: 60 }]
+    const needs = [{ menuId: 'siomay-test', menuName: 'Siomay Test', grossNeed: 60, stockOnHand: 0, netNeed: 60 }]
     const result = optimizeMixes(needs, [MIX_Z])
     // 'mix-z' is NOT in the hardcoded {'mix-a','mix-b','mix-c','mix-e'} — currently undefined
     // After fix, should handle any mix ID

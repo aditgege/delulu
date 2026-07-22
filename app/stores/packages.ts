@@ -1,31 +1,33 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Package, SKU, SupplierPack, SupplierMix } from '~/types'
+import type { Package, Menu, SupplierPack, SupplierMix } from '~/types'
 
 export const usePackageStore = defineStore('packages', () => {
   const packages = ref<Package[]>([])
-  const skus = ref<SKU[]>([])
+  const menus = ref<Menu[]>([])
   const supplierPacks = ref<SupplierPack[]>([])
   const mixes = ref<SupplierMix[]>([])
   const loaded = ref(false)
 
   async function ensureLoaded() {
     if (loaded.value) return
-    // Auto-migrate if first load — will seed DB if empty
     await $fetch('/api/_migrate', { method: 'GET' }).catch(() => {})
-    
-    const [pkgData, skuData, packData, mixData] = await Promise.all([
+
+    const [pkgData, menuData, packData, mixData] = await Promise.all([
       $fetch<Package[]>('/api/packages'),
-      $fetch<SKU[]>('/api/skus'),
+      $fetch<Menu[]>('/api/menus'),
       $fetch<SupplierPack[]>('/api/supplier-packs'),
       $fetch<SupplierMix[]>('/api/mixes'),
     ])
-    
+
     packages.value = pkgData
-    skus.value = skuData
+    menus.value = menuData
     supplierPacks.value = packData
     mixes.value = mixData
     loaded.value = true
+
+    // Pre-load cara masak prices too
+    await ensureCaraMasakLoaded().catch(() => {})
   }
 
   function getPackageById(id: string): Package | undefined {
@@ -36,16 +38,16 @@ export const usePackageStore = defineStore('packages', () => {
     return packages.value
   }
 
-  function getSkuById(id: string): SKU | undefined {
-    return skus.value.find(s => s.id === id)
+  function getMenuById(id: string): Menu | undefined {
+    return menus.value.find(s => s.id === id)
   }
 
-  function getSupplierPack(skuId: string): SupplierPack[] {
-    return supplierPacks.value.filter(p => p.skuId === skuId)
+  function getSupplierPack(menuId: string): SupplierPack[] {
+    return supplierPacks.value.filter(p => p.menuId === menuId)
   }
 
-  function getAllSkus(): SKU[] {
-    return skus.value
+  function getAllMenus(): Menu[] {
+    return menus.value
   }
 
   function getAllSupplierPacks(): SupplierPack[] {
@@ -84,11 +86,36 @@ export const usePackageStore = defineStore('packages', () => {
     await ensureLoaded()
   }
 
+  // New methods
+  const caraMasaks = ref<import('~/types').CaraMasak[]>([])
+  const menuCaraMasaks = ref<import('~/types').MenuCaraMasak[]>([])
+
+  async function ensureCaraMasakLoaded() {
+    if (caraMasaks.value.length > 0) return
+    const [cmData, mcmData] = await Promise.all([
+      $fetch<import('~/types').CaraMasak[]>('/api/cara-masak'),
+      $fetch<import('~/types').MenuCaraMasak[]>('/api/menu-cara-masak'),
+    ])
+    caraMasaks.value = cmData
+    menuCaraMasaks.value = mcmData
+  }
+
+  function getCaraMasak(): import('~/types').CaraMasak[] {
+    ensureCaraMasakLoaded()
+    return caraMasaks.value
+  }
+
+  function getMenuCaraMasak(menuId: string): import('~/types').MenuCaraMasak | undefined {
+    ensureCaraMasakLoaded()
+    return menuCaraMasaks.value.find(m => m.menuId === menuId)
+  }
+
   return {
-    packages, skus, supplierPacks, mixes, loaded,
+    packages, menus, supplierPacks, mixes, loaded,
     ensureLoaded,
-    getPackageById, getAllPackages, getSkuById, getSupplierPack,
-    getAllSkus, getAllSupplierPacks, getAllMixes, getMixById,
+    getPackageById, getAllPackages, getMenuById, getSupplierPack,
+    getAllMenus, getAllSupplierPacks, getAllMixes, getMixById,
     addPackage, updatePackage, removePackage, resetToSeed,
+    getCaraMasak, getMenuCaraMasak,
   }
 })

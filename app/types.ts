@@ -8,32 +8,47 @@ export interface Package {
 }
 
 export interface BomLine {
-  skuId: string
+  menuId: string     // was skuId
   qty: number
 }
 
-export type SkuCategory = 'kukus' | 'goreng' | 'rebus' | 'bento' | 'condiment' | 'other'
+export type MenuCategory = 'dimsum' | 'bento' | 'condiment' | 'other'
 
-export interface SKU {
+export interface Menu {
   id: string
   name: string
   unit: string
-  category?: SkuCategory
+  category?: MenuCategory
 }
 
-// ——— Supplier Mix Paket (bundle of multiple SKUs) ———
+// ——— Cara Masak (cooking methods) ———
+
+export type CaraMasakId = 'bakar' | 'kukus' | 'goreng'
+
+export interface CaraMasak {
+  id: CaraMasakId
+  label: string       // display name: Bakar, Kukus, Goreng
+}
+
+export interface MenuCaraMasak {
+  menuId: string
+  caraMasakId: CaraMasakId
+  hargaPorsi: number
+}
+
+// ——— Supplier Mix Paket (bundle of multiple menu items) ———
 
 export interface SupplierMix {
   id: string
   name: string
   price: number
-  contents: BomLine[] // what SKUs and how many are in one Mix
+  contents: BomLine[] // what menus and how many are in one Mix
 }
 
-// ——— Individual supplier packs (for items like Chili Oil) ———
+// ——— Individual supplier packs ———
 
 export interface SupplierPack {
-  skuId: string
+  menuId: string      // was skuId
   label: string
   sizePcs: number
   price: number
@@ -42,11 +57,21 @@ export interface SupplierPack {
 // ——— Inventory ———
 
 export interface InventoryEntry {
-  skuId: string
+  menuId: string      // was skuId
   qtyOnHand: number
 }
 
 // ——— Orders ———
+
+/** 1 porsi bakar/kukus = 4 pcs menu yang sama */
+export const PORSI_PCS = 4
+
+/** Satu line item untuk menu bakar/kukus: 1 porsi = 4 pcs menu yang sama */
+export interface BakarKukusLine {
+  menuId: string           // was varianId
+  caraMasak: CaraMasakId
+  jumlahPorsi: number
+}
 
 export interface OrderLine {
   packageId: string
@@ -55,41 +80,33 @@ export interface OrderLine {
 
 // ——— Results ———
 
-export interface SkuNeed {
-  skuId: string
-  skuName: string
+export interface MenuNeed {   // was SkuNeed
+  menuId: string
+  menuName: string
   grossNeed: number
   stockOnHand: number
   netNeed: number
 }
 
 export interface MixOption {
-  /** How many of each Mix Paket to buy */
   counts: Record<string, number>
-  /** Total pieces bought across all Mixes */
   totalUnits: number
-  /** Total cost */
   totalCost: number
-  /** Waste per SKU */
   wastePerSku: Record<string, number>
-  /** Total waste (pieces bought but not used) */
   totalWaste: number
 }
 
-export interface MixSkuRecommendation {
-  skuId: string
-  skuName: string
+export interface MixMenuRecommendation {   // was MixSkuRecommendation
+  menuId: string
+  menuName: string
   netNeed: number
   provided: number
   waste: number
 }
 
 export interface MixRecommendation {
-  /** Which Mix Pakets to buy and how many */
   mixes: Array<{ mixId: string; name: string; price: number; qty: number }>
-  /** Per-SKU detail */
-  skuDetails: MixSkuRecommendation[]
-  /** Packages that can be assembled from waste — bonus info */
+  skuDetails: MixMenuRecommendation[]
   wasteBonus: {
     counts: Record<string, number>
     remainingWaste: number
@@ -109,42 +126,49 @@ export interface PackOption {
   totalCost: number
 }
 
-export interface SkuRecommendation {
-  skuId: string
-  skuName: string
+export interface MenuRecommendation {   // was SkuRecommendation
+  menuId: string
+  menuName: string
   netNeed: number
   chosenPack: PackOption
 }
 
 export interface PurchaseRecommendation {
   lines: OrderLine[]
-  needs: SkuNeed[]
+  needs: MenuNeed[]   // was SkuNeed[]
   mixRecommendation: MixRecommendation | null
-  /** Individual SKU purchases for items outside Mix system */
-  individualRecommendations: SkuRecommendation[]
+  individualRecommendations: MenuRecommendation[]   // was SkuRecommendation[]
   grandTotalCost: number
   totalWaste: number
 }
 
-// ——— PO (Purchase Order) Tracking ———
+// ——— PO (Pre-Order) Tracking ———
 
 export interface OrderItem {
   packageId: string
   qty: number
-  extraChiliOil?: number  // extra chili oil bottles (separate from included)
+  extraChiliOil?: number
+}
+
+export interface CustomerBakarKukusItem {
+  menuId: string              // was varianId
+  caraMasak: CaraMasakId
+  jumlahPorsi: number
 }
 
 export interface CustomerOrder {
   id: string
-  name: string               // customer name
+  name: string
   items: OrderItem[]
+  bakarKukusItems?: CustomerBakarKukusItem[]
+  shippingFee: number
   paid: boolean
   shipped: boolean
 }
 
 export interface PurchaseOrder {
   id: string
-  label: string              // e.g. "PO #4 — 25 Juli 2026"
+  label: string
   customers: CustomerOrder[]
   createdAt: number
   closed: boolean

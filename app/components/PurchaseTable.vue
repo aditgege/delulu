@@ -7,7 +7,7 @@ const pkgStore = usePackageStore()
 
 defineProps<{
   recommendations: Array<{
-    skuId: string; skuName: string; netNeed: number
+    menuId: string; menuName: string; netNeed: number
     chosenPack: { mediumPacks: number; largePacks: number; totalUnits: number; waste: number; totalCost: number }
   }>
 }>()
@@ -15,21 +15,11 @@ defineProps<{
 const emojiMap: Record<string, string> = {
   'siomay-ayam': '🥟', 'siomay-udang': '🍤', 'siomay-kepiting': '🦀',
   'siomay-seafood': '🦐', 'siomay-nori': '🌿', 'siomay-mozzarella': '🧀',
-  'siomay-mercon': '🌶️', 'gyoza-ayam': '🥟', 'gyoza-ayam-udang': '🥟',
-  'bakpao-ayam': '🥟', 'bakpao-susu': '🥛', 'bakpao-cokelat': '🍫',
-  'shisitkau': '🥢', 'lumpia-tahu-ayam': '🌯', 'lumpia-tahu-udang': '🥟',
-  'angsio': '🍲', 'hakau': '🥟',
-  'ayam-bola-keju': '🧀', 'pangsit-ayam': '🥟', 'pangsit-udang': '🥟',
-  'ekado': '🥟', 'kumis-naga': '🐉', 'kuotie': '🥟', 'wonton': '🥟',
-  'cakue-goreng-udang': '🦐', 'lumpia-goreng-ayam': '🌯', 'lumpia-goreng-udang': '🌯',
-  'lumpia-goreng-keju': '🧀', 'gohyong': '🥟',
-  'pangsit-ayam-rebus': '🥟',
-  'chicken-drumstick': '🍗', 'kani-roll': '🦀', 'egg-chicken-roll': '🥚',
-  'kaki-naga': '🐉', 'chicken-katsu': '🍗',
+  'hisitkau': '🥢', 'lumpia-kulit-tahu-ayam': '🌯', 'lumpia-kulit-tahu-udang': '🥟',
 }
 
 function e(id: string) { return emojiMap[id] || '📦' }
-function packLabel(skuId: string, label: string) { return pkgStore.getSupplierPack(skuId).find(p => p.label === label) }
+function packLabel(menuId: string, label: string) { return pkgStore.getSupplierPack(menuId).find(p => p.label === label) }
 function fmtRp(n: number) { return 'Rp ' + (n || 0).toLocaleString('id-ID') }
 </script>
 
@@ -37,16 +27,16 @@ function fmtRp(n: number) { return 'Rp ' + (n || 0).toLocaleString('id-ID') }
   <div class="space-y-2">
     <div
       v-for="rec in recommendations"
-      :key="rec.skuId"
+      :key="rec.menuId"
       class="flex items-center gap-3 rounded-2xl border bg-white p-3.5"
       style="border-color: var(--color-blue-100); box-shadow: 0 4px 20px rgba(46, 139, 192, 0.08);"
     >
       <div
         class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-xl"
         style="background: var(--color-cream-100);"
-      >{{ e(rec.skuId) }}</div>
+      >{{ e(rec.menuId) }}</div>
       <div class="min-w-0 flex-1">
-        <div class="font-display text-sm font-semibold" style="color: var(--color-ink-900);">{{ rec.skuName }}</div>
+        <div class="font-display text-sm font-semibold" style="color: var(--color-ink-900);">{{ rec.menuName }}</div>
         <div class="mt-0.5 text-xs font-semibold" style="color: var(--color-ink-500);">
           <span v-if="rec.chosenPack.mediumPacks > 0"><span style="color: var(--color-blue-600);">{{ rec.chosenPack.mediumPacks }} Medium</span> </span>
           <span v-if="rec.chosenPack.largePacks > 0"><span style="color: var(--color-orange-500);">{{ rec.chosenPack.largePacks }} Large</span></span>

@@ -9,12 +9,12 @@ export const useInventoryStore = defineStore('inventory', () => {
   async function ensureLoaded() {
     if (loaded.value) return
     const data = await $fetch<InventoryEntry[]>('/api/inventory')
-    entries.value = data.map((d: any) => ({ skuId: d.sku_id, qtyOnHand: d.qty_on_hand }))
+    entries.value = data.map((d: any) => ({ menuId: d.menu_id, qtyOnHand: d.qty_on_hand }))
     loaded.value = true
   }
 
-  function getStock(skuId: string): number {
-    const found = entries.value.find(e => e.skuId === skuId)
+  function getStock(menuId: string): number {
+    const found = entries.value.find(e => e.menuId === menuId)
     return found ? found.qtyOnHand : 0
   }
 
@@ -22,20 +22,20 @@ export const useInventoryStore = defineStore('inventory', () => {
     return entries.value
   }
 
-  async function setStock(skuId: string, qty: number) {
-    await $fetch('/api/inventory', { method: 'PUT', body: { entries: [{ skuId, qtyOnHand: qty }] } })
-    const idx = entries.value.findIndex(e => e.skuId === skuId)
+  async function setStock(menuId: string, qty: number) {
+    await $fetch('/api/inventory', { method: 'PUT', body: { entries: [{ menuId, qtyOnHand: qty }] } })
+    const idx = entries.value.findIndex(e => e.menuId === menuId)
     if (idx >= 0) {
-      entries.value[idx] = { skuId, qtyOnHand: qty }
+      entries.value[idx] = { menuId, qtyOnHand: qty }
     } else {
-      entries.value.push({ skuId, qtyOnHand: qty })
+      entries.value.push({ menuId, qtyOnHand: qty })
     }
   }
 
-  async function deductStock(skuId: string, qty: number) {
-    await $fetch('/api/inventory-deduct', { method: 'PUT', body: { skuId, qty } })
-    const current = getStock(skuId)
-    setStock(skuId, current - qty)
+  async function deductStock(menuId: string, qty: number) {
+    await $fetch('/api/inventory-deduct', { method: 'PUT', body: { menuId, qty } })
+    const current = getStock(menuId)
+    setStock(menuId, current - qty)
   }
 
   async function resetAll() {
@@ -50,3 +50,4 @@ export const useInventoryStore = defineStore('inventory', () => {
     setStock, deductStock, resetAll,
   }
 })
+

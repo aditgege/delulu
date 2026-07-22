@@ -18,9 +18,14 @@ const greeting = (() => {
 <template>
   <div class="slide-up space-y-4">
     <div class="rounded-2xl border p-4" style="background: var(--color-blue-50); border-color: var(--color-blue-100);">
-      <div class="text-xs font-semibold" style="color: var(--color-ink-500);">{{ greeting }},</div>
-      <div class="font-display text-xl font-semibold" style="color: var(--color-ink-900);">Mau pesen apa hari ini? 🧾</div>
-      <div class="mt-1.5 text-xs font-semibold" style="color: var(--color-ink-500);">Catat pesanan pelanggan, StokCeria urus sisanya.</div>
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="text-xs font-semibold" style="color: var(--color-ink-500);">{{ greeting }},</div>
+          <div class="font-display text-xl font-semibold" style="color: var(--color-ink-900);">Mau pesen apa hari ini? 🧾</div>
+          <div class="mt-1.5 text-xs font-semibold" style="color: var(--color-ink-500);">Catat pesanan pelanggan, StokCeria urus sisanya.</div>
+        </div>
+        <button class="rounded-xl px-3 py-2 text-sm font-bold active:scale-90" style="background: var(--color-cream-100); color: var(--color-ink-700);" @click="navigateTo('/settings')">⚙️</button>
+      </div>
     </div>
 
     <ClientOnly>
