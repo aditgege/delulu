@@ -1,6 +1,10 @@
 export default defineEventHandler(async (event) => {
-  // Skip auth for these paths
   const path = getRequestPath(event)
+
+  // Only protect API routes
+  if (!path.startsWith('/api/')) return
+
+  // Skip auth-check and auth endpoints themselves
   if (
     path === '/api/auth-check' ||
     path === '/api/auth' ||
