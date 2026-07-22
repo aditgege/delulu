@@ -180,6 +180,8 @@ function addBomLine() { editPkg.value.bom.push({ menuId: '', qty: 1 }) }
 
 const emojis: Record<string, string> = { 'paket-halu': '🌟', 'paket-when-ya': '✨', 'paket-solulu': '🌈' }
 
+const totalStock = computed(() => invStore.getAllEntries().reduce((s, e) => s + e.qtyOnHand, 0))
+
 // ── HPP ──
 const hppPerPcs = ref(2133)
 
@@ -307,7 +309,7 @@ onMounted(async () => {
       <div class="rounded-2xl border p-3.5" style="background: var(--color-blue-50); border-color: var(--color-blue-100);">
         <div class="flex items-center justify-between">
           <div class="font-display text-sm font-bold" style="color: var(--color-ink-900);">📦 Stok Inventory</div>
-          <div class="text-[10px] font-semibold" style="color: var(--color-ink-500);">Stok per menu</div>
+          <div class="text-[10px] font-semibold" style="color: var(--color-ink-500);">Total: {{ totalStock }} pcs</div>
         </div>
       </div>
       <ClientOnly>
