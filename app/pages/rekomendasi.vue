@@ -2,14 +2,20 @@
 import { usePurchaseOptimizer } from '~/composables/usePurchaseOptimizer'
 import { useOrderStore } from '~/stores/orders'
 import { usePackageStore } from '~/stores/packages'
+import { useInventoryStore } from '~/stores/inventory'
 
 definePageMeta({ title: 'Rekomendasi Pembelian' })
 
 const { result, loading, error, compute } = usePurchaseOptimizer()
 const orderStore = useOrderStore()
-const pkgStore = usePackageStore()
 
-onMounted(() => compute())
+onMounted(async () => {
+  await Promise.all([
+    usePackageStore().ensureLoaded(),
+    useInventoryStore().ensureLoaded(),
+  ])
+  compute()
+})
 
 function fmtRp(n: number) { return 'Rp ' + (n || 0).toLocaleString('id-ID') }
 

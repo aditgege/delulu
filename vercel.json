@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".output/public",
+  "framework": "nuxt",
+  "functions": {
+    "api/**": {
+      "memory": 256
+    }
+  }
+}

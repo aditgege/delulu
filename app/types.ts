@@ -4,6 +4,7 @@ export interface Package {
   id: string
   name: string
   bom: BomLine[]
+  price?: number      // retail selling price per pack (e.g. 35000)
 }
 
 export interface BomLine {
@@ -11,10 +12,13 @@ export interface BomLine {
   qty: number
 }
 
+export type SkuCategory = 'kukus' | 'goreng' | 'rebus' | 'bento' | 'condiment' | 'other'
+
 export interface SKU {
   id: string
   name: string
   unit: string
+  category?: SkuCategory
 }
 
 // ——— Supplier Mix Paket (bundle of multiple SKUs) ———
@@ -120,4 +124,28 @@ export interface PurchaseRecommendation {
   individualRecommendations: SkuRecommendation[]
   grandTotalCost: number
   totalWaste: number
+}
+
+// ——— PO (Purchase Order) Tracking ———
+
+export interface OrderItem {
+  packageId: string
+  qty: number
+  extraChiliOil?: number  // extra chili oil bottles (separate from included)
+}
+
+export interface CustomerOrder {
+  id: string
+  name: string               // customer name
+  items: OrderItem[]
+  paid: boolean
+  shipped: boolean
+}
+
+export interface PurchaseOrder {
+  id: string
+  label: string              // e.g. "PO #4 — 25 Juli 2026"
+  customers: CustomerOrder[]
+  createdAt: number
+  closed: boolean
 }

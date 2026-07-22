@@ -23,12 +23,12 @@ const emojiMap: Record<string, string> = {
   'kaki-naga': '🐉', 'chicken-katsu': '🍗',
 }
 
-function inc(id: string) { invStore.setStock(id, invStore.getStock(id) + 10) }
-function dec(id: string) { invStore.setStock(id, Math.max(0, invStore.getStock(id) - 10)) }
-function onInput(id: string, e: Event) {
-  const val = parseInt((e.target as HTMLInputElement).value, 10)
-  invStore.setStock(id, isNaN(val) ? 0 : Math.max(0, val))
-}
+	function inc(id: string) { invStore.setStock(id, invStore.getStock(id) + 10) }
+	function dec(id: string) { invStore.setStock(id, invStore.getStock(id) - 10) }
+	function onInput(id: string, e: Event) {
+	  const val = parseInt((e.target as HTMLInputElement).value, 10)
+	  invStore.setStock(id, isNaN(val) ? 0 : val)
+	}
 </script>
 
 <template>
@@ -57,17 +57,16 @@ function onInput(id: string, e: Event) {
           <div class="flex items-center gap-1">
             <button
               class="flex h-6 w-6 items-center justify-center rounded-lg border text-xs font-bold transition-colors active:scale-90"
-              :disabled="invStore.getStock(sku.id) <= 0"
               style="border-color: var(--color-blue-200); background: white; color: var(--color-blue-600);"
               @click="dec(sku.id)"
             >−</button>
             <input
               type="number"
               :value="invStore.getStock(sku.id)"
-              min="0"
               inputmode="numeric"
-              class="w-7 text-center font-display text-sm font-semibold outline-none"
-              style="color: var(--color-ink-900); background: transparent;"
+              class="w-9 text-center font-display text-sm font-semibold outline-none"
+              :class="{ 'text-red-500': invStore.getStock(sku.id) < 0 }"
+              :style="{ background: 'transparent' }"
               @input="onInput(sku.id, $event)"
             />
             <button

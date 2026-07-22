@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { usePackageStore } from '~/stores/packages'
+import { useInventoryStore } from '~/stores/inventory'
 
 definePageMeta({ title: 'Stok & Pengaturan' })
 
 const pkgStore = usePackageStore()
+const invStore = useInventoryStore()
+onMounted(async () => {
+  await Promise.all([pkgStore.ensureLoaded(), invStore.ensureLoaded()])
+})
 const packages = computed(() => pkgStore.getAllPackages())
 const allSkus = computed(() => pkgStore.getAllSkus())
 const inventory = computed(() => pkgStore.getAllSupplierPacks)
@@ -131,5 +136,9 @@ function decBom(idx: number) { const e = editBom.value[idx]; if (e && e.qty > 1)
         </div>
       </div>
     </template>
+
+    <div class="border-t pt-4" style="border-color: var(--color-blue-100);">
+      <InventoryInput />
+    </div>
   </div>
 </template>

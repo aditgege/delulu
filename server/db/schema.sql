@@ -1,0 +1,75 @@
+-- Delulul Schema for Neon PostgreSQL
+
+CREATE TABLE IF NOT EXISTS skus (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  unit TEXT NOT NULL DEFAULT 'pcs',
+  category TEXT
+);
+
+CREATE TABLE IF NOT EXISTS packages (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  price INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS package_bom (
+  package_id TEXT NOT NULL REFERENCES packages(id) ON DELETE CASCADE,
+  sku_id TEXT NOT NULL REFERENCES skus(id),
+  qty INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (package_id, sku_id)
+);
+
+CREATE TABLE IF NOT EXISTS supplier_packs (
+  id SERIAL PRIMARY KEY,
+  sku_id TEXT NOT NULL REFERENCES skus(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  size_pcs INTEGER NOT NULL,
+  price INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS supplier_mixes (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  price INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS mix_contents (
+  mix_id TEXT NOT NULL REFERENCES supplier_mixes(id) ON DELETE CASCADE,
+  sku_id TEXT NOT NULL REFERENCES skus(id),
+  qty INTEGER NOT NULL DEFAULT 6,
+  PRIMARY KEY (mix_id, sku_id)
+);
+
+CREATE TABLE IF NOT EXISTS inventory (
+  sku_id TEXT PRIMARY KEY REFERENCES skus(id) ON DELETE CASCADE,
+  qty_on_hand INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  created_at BIGINT NOT NULL,
+  closed BOOLEAN NOT NULL DEFAULT false
+);
+
+CREATE TABLE IF NOT EXISTS order_customers (
+  id TEXT PRIMARY KEY,
+  po_id TEXT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  paid BOOLEAN NOT NULL DEFAULT false,
+  shipped BOOLEAN NOT NULL DEFAULT false
+);
+
+CREATE TABLE IF NOT EXISTS order_items (
+  id SERIAL PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES order_customers(id) ON DELETE CASCADE,
+  package_id TEXT NOT NULL,
+  qty INTEGER NOT NULL DEFAULT 0,
+  extra_chili_oil INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS app_config (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);

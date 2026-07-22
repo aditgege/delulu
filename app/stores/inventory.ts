@@ -1,14 +1,17 @@
 import { defineStore } from 'pinia'
-import { useLocalStorage } from '@vueuse/core'
-import { SEED_SKUS } from '~/data/seed'
-import type { InventoryEntry, SKU } from '~/types'
+import { ref } from 'vue'
+import type { InventoryEntry } from '~/types'
 
 export const useInventoryStore = defineStore('inventory', () => {
-  function defaultInventory(): InventoryEntry[] {
-    return SEED_SKUS.map((sku: SKU) => ({ skuId: sku.id, qtyOnHand: 0 }))
-  }
+  const entries = ref<InventoryEntry[]>([])
+  const loaded = ref(false)
 
-  const entries = useLocalStorage<InventoryEntry[]>('delulul:inventory', defaultInventory())
+  async function ensureLoaded() {
+    if (loaded.value) return
+    const data = await $fetch<InventoryEntry[]>('/api/inventory')
+    entries.value = data.map((d: any) => ({ skuId: d.sku_id, qtyOnHand: d.qty_on_hand }))
+    loaded.value = true
+  }
 
   function getStock(skuId: string): number {
     const found = entries.value.find(e => e.skuId === skuId)
@@ -19,27 +22,30 @@ export const useInventoryStore = defineStore('inventory', () => {
     return entries.value
   }
 
-  function setStock(skuId: string, qty: number): void {
+  async function setStock(skuId: string, qty: number) {
+    await $fetch('/api/inventory', { method: 'PUT', body: { entries: [{ skuId, qtyOnHand: qty }] } })
     const idx = entries.value.findIndex(e => e.skuId === skuId)
-    const validQty = Math.max(0, qty)
     if (idx >= 0) {
-      entries.value[idx] = { skuId, qtyOnHand: validQty }
+      entries.value[idx] = { skuId, qtyOnHand: qty }
     } else {
-      entries.value.push({ skuId, qtyOnHand: validQty })
+      entries.value.push({ skuId, qtyOnHand: qty })
     }
   }
 
-  function deductStock(skuId: string, qty: number): void {
+  async function deductStock(skuId: string, qty: number) {
+    await $fetch('/api/inventory-deduct', { method: 'PUT', body: { skuId, qty } })
     const current = getStock(skuId)
-    setStock(skuId, Math.max(0, current - qty))
+    setStock(skuId, current - qty)
   }
 
-  function resetAll(): void {
-    entries.value = defaultInventory()
+  async function resetAll() {
+    await $fetch('/api/inventory-reset', { method: 'PUT' })
+    entries.value = entries.value.map(e => ({ ...e, qtyOnHand: 0 }))
   }
 
   return {
-    entries,
+    entries, loaded,
+    ensureLoaded,
     getStock, getAllEntries,
     setStock, deductStock, resetAll,
   }

@@ -1,13 +1,32 @@
 import { defineStore } from 'pinia'
-import { useLocalStorage } from '@vueuse/core'
-import { SEED_SKUS, SEED_PACKAGES, SEED_SUPPLIER_PACKS, SEED_MIXES, EXTRA_SUPPLIER_PACKS, CHILI_OIL_SKUS } from '~/data/seed'
+import { ref } from 'vue'
 import type { Package, SKU, SupplierPack, SupplierMix } from '~/types'
 
 export const usePackageStore = defineStore('packages', () => {
-  const packages = useLocalStorage<Package[]>('delulul:packages', [...SEED_PACKAGES])
-  const skus = useLocalStorage<SKU[]>('delulul:skus', [...SEED_SKUS, ...CHILI_OIL_SKUS])
-  const supplierPacks = useLocalStorage<SupplierPack[]>('delulul:supplierPacks', [...SEED_SUPPLIER_PACKS, ...EXTRA_SUPPLIER_PACKS])
-  const mixes = useLocalStorage<SupplierMix[]>('delulul:mixes', [...SEED_MIXES])
+  const packages = ref<Package[]>([])
+  const skus = ref<SKU[]>([])
+  const supplierPacks = ref<SupplierPack[]>([])
+  const mixes = ref<SupplierMix[]>([])
+  const loaded = ref(false)
+
+  async function ensureLoaded() {
+    if (loaded.value) return
+    // Auto-migrate if first load — will seed DB if empty
+    await $fetch('/api/_migrate', { method: 'GET' }).catch(() => {})
+    
+    const [pkgData, skuData, packData, mixData] = await Promise.all([
+      $fetch<Package[]>('/api/packages'),
+      $fetch<SKU[]>('/api/skus'),
+      $fetch<SupplierPack[]>('/api/supplier-packs'),
+      $fetch<SupplierMix[]>('/api/mixes'),
+    ])
+    
+    packages.value = pkgData
+    skus.value = skuData
+    supplierPacks.value = packData
+    mixes.value = mixData
+    loaded.value = true
+  }
 
   function getPackageById(id: string): Package | undefined {
     return packages.value.find(p => p.id === id)
@@ -41,31 +60,33 @@ export const usePackageStore = defineStore('packages', () => {
     return mixes.value.find(m => m.id === id)
   }
 
-  function addPackage(pkg: Package): void {
+  async function addPackage(pkg: Package) {
+    await $fetch('/api/packages', { method: 'POST', body: pkg })
     packages.value.push(pkg)
   }
 
-  function updatePackage(id: string, updates: Partial<Package>): void {
+  async function updatePackage(id: string, updates: Partial<Package>) {
+    const existing = packages.value.find(p => p.id === id)
+    if (!existing) return
+    const updated = { ...existing, ...updates, id, bom: updates.bom || existing.bom }
+    await $fetch('/api/packages', { method: 'PUT', body: updated })
     const idx = packages.value.findIndex(p => p.id === id)
-    if (idx >= 0) {
-      const existing = packages.value[idx]!
-      packages.value[idx] = { id: existing.id, name: existing.name, bom: existing.bom, ...updates }
-    }
+    if (idx >= 0) packages.value[idx] = updated
   }
 
-  function removePackage(id: string): void {
+  async function removePackage(id: string) {
+    await $fetch('/api/packages', { method: 'DELETE', body: { id } })
     packages.value = packages.value.filter(p => p.id !== id)
   }
 
-  function resetToSeed(): void {
-    packages.value = [...SEED_PACKAGES]
-    skus.value = [...SEED_SKUS, ...CHILI_OIL_SKUS]
-    supplierPacks.value = [...SEED_SUPPLIER_PACKS, ...EXTRA_SUPPLIER_PACKS]
-    mixes.value = [...SEED_MIXES]
+  async function resetToSeed() {
+    await $fetch('/api/_migrate', { method: 'GET' })
+    await ensureLoaded()
   }
 
   return {
-    packages, skus, supplierPacks, mixes,
+    packages, skus, supplierPacks, mixes, loaded,
+    ensureLoaded,
     getPackageById, getAllPackages, getSkuById, getSupplierPack,
     getAllSkus, getAllSupplierPacks, getAllMixes, getMixById,
     addPackage, updatePackage, removePackage, resetToSeed,

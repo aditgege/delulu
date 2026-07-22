@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
-import { useLocalStorage } from '@vueuse/core'
+import { ref } from 'vue'
 import type { OrderLine } from '~/types'
 
+// Orders are ephemeral / session-based — keep in memory only
 export const useOrderStore = defineStore('orders', () => {
-  const lines = useLocalStorage<OrderLine[]>('delulul:orders', [])
+  const lines = ref<OrderLine[]>([])
 
   function getOrderLines(): OrderLine[] {
     return lines.value

@@ -57,15 +57,14 @@ const route = useRoute()
 const tabs = [
   { id: 'order', label: 'Pesanan', emoji: '🛒', to: '/' },
   { id: 'results', label: 'Hasil', emoji: '📊', to: '/rekomendasi' },
-  { id: 'inventory', label: 'Stok', emoji: '📦', to: '/kelola-paket' },
-  { id: 'settings', label: 'Set', emoji: '⚙️', to: '/kelola-paket' },
+  { id: 'manage', label: 'Stok & Atur', emoji: '⚙️', to: '/kelola-paket' },
 ]
 
 const currentTab = computed(() => {
   const path = route.path
   if (path === '/') return 'order'
   if (path === '/rekomendasi') return 'results'
-  return 'settings'
+  return 'manage'
 })
 
 const todayStr = new Date().toLocaleDateString('id-ID', {

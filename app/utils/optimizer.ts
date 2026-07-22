@@ -40,19 +40,27 @@ export function optimizeMixes(
   const maxNeed = Math.max(...relevantSkus.map(s => needMap.get(s)!))
   const maxPerMix = Math.ceil(maxNeed / 6)
 
-  let best: MixOption | null = null
-  const counts = { 'mix-a': 0, 'mix-b': 0, 'mix-c': 0, 'mix-e': 0 }
+  // Performance guard: cap at 100 per mix to prevent browser freeze
+  const bound = Math.min(maxPerMix, 100)
+  if (bound < maxPerMix) {
+    console.warn(
+      `[optimizer] mix search truncated at ${bound} per mix (need ${maxPerMix}). ` +
+      `Result may under-purchase for orders >${bound * 6} pcs per SKU.`
+    )
+  }
 
-  // Iterate
-  for (let a = 0; a <= Math.min(maxPerMix, 50); a++) {
-    counts['mix-a'] = a
-    for (let b = 0; b <= Math.min(maxPerMix, 50); b++) {
-      counts['mix-b'] = b
-      for (let c = 0; c <= Math.min(maxPerMix, 50); c++) {
-        counts['mix-c'] = c
-        // Early prune: compute running cost
-        for (let e = 0; e <= Math.min(maxPerMix, 50); e++) {
-          counts['mix-e'] = e
+  let best: MixOption | null = null
+  const counts: Record<string, number> = Object.fromEntries(mixes.map(m => [m.id, 0]))
+
+  // Iterate — dynamically iterate over all mixes
+  for (let a = 0; a <= bound; a++) {
+    counts[mixIds[0]!] = a
+    for (let b = 0; b <= (mixIds[1] ? bound : 0); b++) {
+      counts[mixIds[1]!] = b
+      for (let c = 0; c <= (mixIds[2] ? bound : 0); c++) {
+        counts[mixIds[2]!] = c
+        for (let e = 0; e <= (mixIds[3] ? bound : 0); e++) {
+          if (mixIds[3]) counts[mixIds[3]!] = e
 
           // Compute per-SKU provided
           const provided = new Map<string, number>()
@@ -60,7 +68,7 @@ export function optimizeMixes(
           let totalCost = 0
 
           for (const mix of mixData) {
-            const cnt = counts[mix.id as keyof typeof counts]
+            const cnt = counts[mix.id] ?? 0
             if (cnt === 0) continue
             for (const [skuId, qty] of mix.prov) {
               provided.set(skuId, (provided.get(skuId) || 0) + qty * cnt)
@@ -162,18 +170,24 @@ export interface WastePackageResult {
 }
 
 /**
- * Given leftover pieces from Mix purchases, find how many Halu/When Ya/Solulu
- * can be assembled. Brute force 3 variables × ~max 15 each = ~3375 iterations.
+ * Given leftover pieces from Mix purchases, find how many retail packages
+ * can be assembled from waste. Dynamic — supports any number of packages.
+ * Brute-force with depth = package count, each bounded by max 20.
  */
 export function optimizeWasteToPackages(
   wastePerSku: Record<string, number>,
   packages: Package[],
-  targetIds: string[] = ['paket-halu', 'paket-when-ya', 'paket-solulu'],
+  targetIds?: string[],
 ): WastePackageResult | null {
-  const pkgs = packages.filter(p => targetIds.includes(p.id))
+  const pkgs = targetIds
+    ? packages.filter(p => targetIds.includes(p.id))
+    : packages
   if (pkgs.length === 0) return null
 
-  // Compute max per package
+  const startWaste = Object.values(wastePerSku).reduce((s, n) => s + n, 0)
+  if (startWaste === 0) return null
+
+  // Compute max per package (cap at 20 to keep brute-force bounded)
   const maxPerPkg = pkgs.map(pkg => {
     let max = Infinity
     for (const b of pkg.bom) {
@@ -184,50 +198,52 @@ export function optimizeWasteToPackages(
     return { id: pkg.id, max: Math.min(max, 20) }
   })
 
-  const startWaste = Object.values(wastePerSku).reduce((s, n) => s + n, 0)
-  if (startWaste === 0) return null
-
   let best: WastePackageResult | null = null
-  const totals: Record<string, number> = { 'paket-halu': 0, 'paket-when-ya': 0, 'paket-solulu': 0 }
 
-  for (let h = 0; h <= maxPerPkg[0]!.max; h++) {
-    totals['paket-halu'] = h
-    for (let w = 0; w <= maxPerPkg[1]!.max; w++) {
-      totals['paket-when-ya'] = w
-      for (let s = 0; s <= maxPerPkg[2]!.max; s++) {
-        totals['paket-solulu'] = s
+  // Recursive brute-force over N packages
+  function recurse(index: number, counts: Record<string, number>, remaining: Record<string, number>): void {
+    if (index >= maxPerPkg.length) {
+      const remainingTotal = Object.values(remaining).reduce((s, n) => s + n, 0)
+      const totalPkgs = Object.values(counts).reduce((s, n) => s + n, 0)
+      if (
+        !best ||
+        remainingTotal < best.remainingWaste ||
+        (remainingTotal === best.remainingWaste && totalPkgs > best.totalPackages)
+      ) {
+        best = { counts: { ...counts }, remainingWaste: remainingTotal, totalPackages: totalPkgs }
+      }
+      return
+    }
 
-        // Compute remaining waste
-        const remaining = { ...wastePerSku }
-        for (const pkg of pkgs) {
-          const count = totals[pkg.id] || 0
-          if (count === 0) continue
-          for (const b of pkg.bom) {
-            remaining[b.skuId] = (remaining[b.skuId] || 0) - count * b.qty
-          }
-        }
-
-        // Check negative
-        let valid = true
-        for (const v of Object.values(remaining)) {
-          if (v < 0) { valid = false; break }
-        }
-        if (!valid) continue
-
-        // Prune: if total waste already >= best and total packages <= best, skip
-        const remainingTotal = Object.values(remaining).reduce((s, n) => s + n, 0)
-        const totalPkgs = h + w + s
-        if (best && remainingTotal >= best.remainingWaste && totalPkgs <= best.totalPackages) continue
-
-        if (!best ||
-            remainingTotal < best.remainingWaste ||
-            (remainingTotal === best.remainingWaste && totalPkgs > best.totalPackages)) {
-          best = { counts: { ...totals }, remainingWaste: remainingTotal, totalPackages: totalPkgs }
+    const pkg = maxPerPkg[index]!
+    for (let n = 0; n <= pkg.max; n++) {
+      // Apply this package n times
+      const newRemaining = { ...remaining }
+      const pkgDef = pkgs.find(p => p.id === pkg.id)
+      if (pkgDef) {
+        for (const b of pkgDef.bom) {
+          newRemaining[b.skuId] = (newRemaining[b.skuId] || 0) - n * b.qty
         }
       }
+      // If any negative, skip
+      let valid = true
+      for (const v of Object.values(newRemaining)) {
+        if (v < 0) { valid = false; break }
+      }
+      if (!valid) continue
+
+      // Prune: if remaining >= best.remaining and totalPkgs <= best, skip
+      const remainingTotal = Object.values(newRemaining).reduce((s, n) => s + n, 0)
+      const currentPkgs = Object.values(counts).reduce((s, n) => s + n, 0) + n
+      if (best && remainingTotal >= best.remainingWaste && currentPkgs <= best.totalPackages) continue
+
+      counts[pkg.id] = n
+      recurse(index + 1, counts, newRemaining)
     }
+    delete counts[pkg.id]
   }
 
+  recurse(0, {}, { ...wastePerSku })
   return best
 }
 
@@ -368,6 +384,9 @@ export function computeFullRecommendation(
   let mixRecommendation: MixRecommendation | null = null
   if (mixOption) {
     mixRecommendation = buildMixRecommendation(needs, mixes, mixOption, packages)
+  } else {
+    // If optimizer fails (cap truncation), don't block individual packs for mix-covered SKUs
+    mixCoveredSkus.clear()
   }
 
   // 2. Individual packs for non-Mix SKUs

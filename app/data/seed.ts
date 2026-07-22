@@ -2,44 +2,44 @@ import type { Package, SKU, SupplierPack, SupplierMix } from '~/types'
 
 export const SEED_SKUS: SKU[] = [
   // Kukus
-  { id: 'siomay-ayam', name: 'Siomay Ayam', unit: 'pcs' },
-  { id: 'siomay-kepiting', name: 'Siomay Kepiting', unit: 'pcs' },
-  { id: 'siomay-seafood', name: 'Siomay Seafood', unit: 'pcs' },
-  { id: 'siomay-udang', name: 'Siomay Udang', unit: 'pcs' },
-  { id: 'siomay-nori', name: 'Siomay Nori', unit: 'pcs' },
-  { id: 'siomay-mozzarella', name: 'Siomay Mozzarella', unit: 'pcs' },
-  { id: 'siomay-mercon', name: 'Siomay Mercon', unit: 'pcs' },
-  { id: 'gyoza-ayam', name: 'Gyoza Ayam', unit: 'pcs' },
-  { id: 'gyoza-ayam-udang', name: 'Gyoza Ayam Udang', unit: 'pcs' },
-  { id: 'bakpao-ayam', name: 'Bakpao Ayam', unit: 'pcs' },
-  { id: 'bakpao-susu', name: 'Bakpao Susu', unit: 'pcs' },
-  { id: 'bakpao-cokelat', name: 'Bakpao Cokelat', unit: 'pcs' },
-  { id: 'shisitkau', name: 'Shisitkau', unit: 'pcs' },
-  { id: 'lumpia-tahu-ayam', name: 'Lumpia Kulit Tahu Ayam', unit: 'pcs' },
-  { id: 'lumpia-tahu-udang', name: 'Lumpia Kulit Tahu Udang', unit: 'pcs' },
-  { id: 'angsio', name: 'Angsio', unit: 'pcs' },
-  { id: 'hakau', name: 'Hakau', unit: 'pcs' },
+  { id: 'siomay-ayam', name: 'Siomay Ayam', unit: 'pcs', category: 'kukus' },
+  { id: 'siomay-kepiting', name: 'Siomay Kepiting', unit: 'pcs', category: 'kukus' },
+  { id: 'siomay-seafood', name: 'Siomay Seafood', unit: 'pcs', category: 'kukus' },
+  { id: 'siomay-udang', name: 'Siomay Udang', unit: 'pcs', category: 'kukus' },
+  { id: 'siomay-nori', name: 'Siomay Nori', unit: 'pcs', category: 'kukus' },
+  { id: 'siomay-mozzarella', name: 'Siomay Mozzarella', unit: 'pcs', category: 'kukus' },
+  { id: 'siomay-mercon', name: 'Siomay Mercon', unit: 'pcs', category: 'kukus' },
+  { id: 'gyoza-ayam', name: 'Gyoza Ayam', unit: 'pcs', category: 'kukus' },
+  { id: 'gyoza-ayam-udang', name: 'Gyoza Ayam Udang', unit: 'pcs', category: 'kukus' },
+  { id: 'bakpao-ayam', name: 'Bakpao Ayam', unit: 'pcs', category: 'kukus' },
+  { id: 'bakpao-susu', name: 'Bakpao Susu', unit: 'pcs', category: 'kukus' },
+  { id: 'bakpao-cokelat', name: 'Bakpao Cokelat', unit: 'pcs', category: 'kukus' },
+  { id: 'shisitkau', name: 'Shisitkau', unit: 'pcs', category: 'kukus' },
+  { id: 'lumpia-tahu-ayam', name: 'Lumpia Kulit Tahu Ayam', unit: 'pcs', category: 'kukus' },
+  { id: 'lumpia-tahu-udang', name: 'Lumpia Kulit Tahu Udang', unit: 'pcs', category: 'kukus' },
+  { id: 'angsio', name: 'Angsio', unit: 'pcs', category: 'kukus' },
+  { id: 'hakau', name: 'Hakau', unit: 'pcs', category: 'kukus' },
   // Goreng
-  { id: 'ayam-bola-keju', name: 'Ayam Bola Keju', unit: 'pcs' },
-  { id: 'pangsit-ayam', name: 'Pangsit Ayam', unit: 'pcs' },
-  { id: 'pangsit-udang', name: 'Pangsit Udang', unit: 'pcs' },
-  { id: 'ekado', name: 'Ekado', unit: 'pcs' },
-  { id: 'kumis-naga', name: 'Kumis Naga', unit: 'pcs' },
-  { id: 'kuotie', name: 'Kuotie', unit: 'pcs' },
-  { id: 'wonton', name: 'Wonton', unit: 'pcs' },
-  { id: 'cakue-goreng-udang', name: 'Cakue Goreng Udang', unit: 'pcs' },
-  { id: 'lumpia-goreng-ayam', name: 'Lumpia Goreng Ayam', unit: 'pcs' },
-  { id: 'lumpia-goreng-udang', name: 'Lumpia Goreng Udang', unit: 'pcs' },
-  { id: 'lumpia-goreng-keju', name: 'Lumpia Goreng Ayam Keju Lumer', unit: 'pcs' },
-  { id: 'gohyong', name: 'Gohyong', unit: 'pcs' },
+  { id: 'ayam-bola-keju', name: 'Ayam Bola Keju', unit: 'pcs', category: 'goreng' },
+  { id: 'pangsit-ayam', name: 'Pangsit Ayam', unit: 'pcs', category: 'goreng' },
+  { id: 'pangsit-udang', name: 'Pangsit Udang', unit: 'pcs', category: 'goreng' },
+  { id: 'ekado', name: 'Ekado', unit: 'pcs', category: 'goreng' },
+  { id: 'kumis-naga', name: 'Kumis Naga', unit: 'pcs', category: 'goreng' },
+  { id: 'kuotie', name: 'Kuotie', unit: 'pcs', category: 'goreng' },
+  { id: 'wonton', name: 'Wonton', unit: 'pcs', category: 'goreng' },
+  { id: 'cakue-goreng-udang', name: 'Cakue Goreng Udang', unit: 'pcs', category: 'goreng' },
+  { id: 'lumpia-goreng-ayam', name: 'Lumpia Goreng Ayam', unit: 'pcs', category: 'goreng' },
+  { id: 'lumpia-goreng-udang', name: 'Lumpia Goreng Udang', unit: 'pcs', category: 'goreng' },
+  { id: 'lumpia-goreng-keju', name: 'Lumpia Goreng Ayam Keju Lumer', unit: 'pcs', category: 'goreng' },
+  { id: 'gohyong', name: 'Gohyong', unit: 'pcs', category: 'goreng' },
   // Rebus
-  { id: 'pangsit-ayam-rebus', name: 'Pangsit Ayam Rebus', unit: 'pcs' },
+  { id: 'pangsit-ayam-rebus', name: 'Pangsit Ayam Rebus', unit: 'pcs', category: 'rebus' },
   // Bento
-  { id: 'chicken-drumstick', name: 'Chicken Drumstick', unit: 'pcs' },
-  { id: 'kani-roll', name: 'Kani Roll', unit: 'pcs' },
-  { id: 'egg-chicken-roll', name: 'Egg Chicken Roll', unit: 'pcs' },
-  { id: 'kaki-naga', name: 'Kaki Naga', unit: 'pcs' },
-  { id: 'chicken-katsu', name: 'Chicken Katsu', unit: 'pcs' },
+  { id: 'chicken-drumstick', name: 'Chicken Drumstick', unit: 'pcs', category: 'bento' },
+  { id: 'kani-roll', name: 'Kani Roll', unit: 'pcs', category: 'bento' },
+  { id: 'egg-chicken-roll', name: 'Egg Chicken Roll', unit: 'pcs', category: 'bento' },
+  { id: 'kaki-naga', name: 'Kaki Naga', unit: 'pcs', category: 'bento' },
+  { id: 'chicken-katsu', name: 'Chicken Katsu', unit: 'pcs', category: 'bento' },
 ]
 
 export const SEED_SUPPLIER_PACKS: SupplierPack[] = [
@@ -103,6 +103,7 @@ export const SEED_PACKAGES: Package[] = [
   {
     id: 'paket-halu',
     name: 'Paket Halu',
+    price: 35000,
     bom: [
       { skuId: 'siomay-ayam', qty: 1 },
       { skuId: 'lumpia-tahu-udang', qty: 1 },
@@ -114,6 +115,7 @@ export const SEED_PACKAGES: Package[] = [
   {
     id: 'paket-when-ya',
     name: 'Paket When Ya',
+    price: 35000,
     bom: [
       { skuId: 'siomay-udang', qty: 1 },
       { skuId: 'lumpia-tahu-ayam', qty: 1 },
@@ -125,6 +127,7 @@ export const SEED_PACKAGES: Package[] = [
   {
     id: 'paket-solulu',
     name: 'Paket Solulu',
+    price: 35000,
     bom: [
       { skuId: 'siomay-ayam', qty: 1 },
       { skuId: 'lumpia-tahu-ayam', qty: 1 },
@@ -197,15 +200,15 @@ export const EXTRA_SUPPLIER_PACKS: SupplierPack[] = [
 ]
 
 export const CHILI_OIL_SKUS: SKU[] = [
-  { id: 'chili-oil-80', name: 'Chili Oil 80 ml', unit: 'botol' },
-  { id: 'chili-oil-500', name: 'Chili Oil 500 ml', unit: 'botol' },
-  { id: 'chili-oil-1l', name: 'Chili Oil 1 Liter', unit: 'botol' },
+  { id: 'chili-oil-80', name: 'Chili Oil 80 ml', unit: 'botol', category: 'condiment' },
+  { id: 'chili-oil-500', name: 'Chili Oil 500 ml', unit: 'botol', category: 'condiment' },
+  { id: 'chili-oil-1l', name: 'Chili Oil 1 Liter', unit: 'botol', category: 'condiment' },
 ]
 
 // SKUs that ARE covered by Mixes (for quick lookup)
 export const MIX_COVERED_SKUS = new Set([
   'siomay-ayam', 'siomay-kepiting', 'siomay-seafood', 'siomay-udang',
-  'siomay-nori', 'siomay-mozzarella', 'siomay-mercon',
+  'siomay-nori', 'siomay-mozzarella',
   'lumpia-tahu-ayam', 'lumpia-tahu-udang', 'shisitkau',
   'kuotie', 'lumpia-goreng-ayam', 'wonton', 'ekado', 'kumis-naga',
 ])

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { findOptimalPacks, optimizeWasteToPackages } from './optimizer'
-import type { Package } from '~/types'
+import { findOptimalPacks, optimizeWasteToPackages, optimizeMixes, computeNeeds } from './optimizer'
+import type { Package, SupplierMix, SKU, InventoryEntry, OrderLine } from '~/types'
 
 const PACKAGES: Package[] = [
   {
@@ -85,5 +85,59 @@ describe('optimizeWasteToPackages', () => {
     const waste = { 'siomay-ayam': 1 }
     const r = optimizeWasteToPackages(waste, PACKAGES)
     if (r) expect(r.totalPackages).toBe(0)
+  })
+
+  it('handles custom package IDs not in hardcoded default (RED — bug #3)', () => {
+    // A new package not in the hardcoded ['paket-halu', 'paket-when-ya', 'paket-solulu']
+    const customPkg: Package = {
+      id: 'paket-test',
+      name: 'Paket Test',
+      bom: [
+        { skuId: 'siomay-ayam', qty: 2 },
+        { skuId: 'siomay-nori', qty: 2 },
+      ],
+    }
+    const waste = { 'siomay-ayam': 10, 'siomay-nori': 10 }
+    const result = optimizeWasteToPackages(waste, [...PACKAGES, customPkg])
+    // With the hardcoded targetIds default, customPkg is skipped.
+    // After fix, it should be considered and totalPackages > 0.
+    expect(result).not.toBeNull()
+    expect(result!.totalPackages).toBeGreaterThan(0)
+  })
+})
+
+describe('optimizeMixes — adversarial bug tests', () => {
+  const MIX_A: SupplierMix = {
+    id: 'mix-a',
+    name: 'Mix A',
+    price: 64000,
+    contents: [{ skuId: 'siomay-ayam', qty: 6 }],
+  }
+
+  const MIX_Z: SupplierMix = {
+    id: 'mix-z',
+    name: 'Mix Z',
+    price: 64000,
+    contents: [{ skuId: 'siomay-test', qty: 6 }],
+  }
+
+  it('returns null for need >300 due to cap-50 (RED — bug #1)', () => {
+    // 1 SKU need=400 → maxPerMix = ceil(400/6) = 67, capped at 50 → 300 pcs < 400
+    const needs = [{ skuId: 'siomay-ayam', skuName: 'Siomay Ayam', grossNeed: 400, stockOnHand: 0, netNeed: 400 }]
+    const result = optimizeMixes(needs, [MIX_A])
+    // Currently returns null because cap-50 prevents finding 67 mixes
+    // After fix, should return a valid solution
+    expect(result).not.toBeNull()
+    expect(result!.totalWaste).toBeGreaterThanOrEqual(0)
+    expect(result!.totalUnits).toBeGreaterThanOrEqual(400)
+  })
+
+  it('handles custom mix ID not in hardcoded set (RED — bug #2)', () => {
+    const needs = [{ skuId: 'siomay-test', skuName: 'Siomay Test', grossNeed: 60, stockOnHand: 0, netNeed: 60 }]
+    const result = optimizeMixes(needs, [MIX_Z])
+    // 'mix-z' is NOT in the hardcoded {'mix-a','mix-b','mix-c','mix-e'} — currently undefined
+    // After fix, should handle any mix ID
+    expect(result).not.toBeNull()
+    expect(result!.totalUnits).toBeGreaterThanOrEqual(60)
   })
 })
