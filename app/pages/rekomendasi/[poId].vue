@@ -58,6 +58,12 @@ const emojiMap: Record<string, string> = {
   'hisitkau': '🥢', 'lumpia-kulit-tahu-ayam': '🌯', 'lumpia-kulit-tahu-udang': '🥟',
 }
 function e(id: string) { return emojiMap[id] || '📦' }
+const visibleNeeds = computed(() => result.value?.needs.filter(n => n.grossNeed > 0) || [])
+const itemsHabis = computed(() => result.value?.needs.filter(n => n.stockOnHand === 0 && n.grossNeed > 0) || [])
+const itemsStokHabis = computed(() => result.value?.needs.filter(n => n.stockOnHand === 0) || [])
+const totalDipakai = computed(() => visibleNeeds.value.reduce((s, n) => s + Math.min(n.grossNeed, n.stockOnHand), 0))
+const totalSisa = computed(() => visibleNeeds.value.reduce((s, n) => s + Math.max(0, n.stockOnHand - n.grossNeed), 0))
+const totalKurang = computed(() => visibleNeeds.value.reduce((s, n) => s + n.netNeed, 0))
 function hargaPorsi(menuId: string, cm: string): number {
   return pkgStore.getMenuCaraMasak(menuId, cm)?.hargaPorsi ?? (cm === 'bakar' ? 18000 : 16000)
 }
@@ -194,11 +200,48 @@ async function fetchHpp() {
         </div>
       </template>
 
+      <!-- ⚠️ Items Habis -->
+      <template v-if="itemsStokHabis.length > 0">
+        <div class="rounded-2xl border p-3.5" style="background: #FEF2F2; border-color: #FECACA;">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-lg">⚠️</span>
+            <span class="font-display text-sm font-bold" style="color: #B91C1C;">Stok Habis — perlu restock</span>
+            <span class="ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold" style="background: #FECACA; color: #B91C1C;">{{ itemsStokHabis.length }} item</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <span v-for="item in itemsStokHabis" :key="item.menuId"
+              class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold"
+              :style="{ background: item.grossNeed > 0 ? '#FEE2E2' : '#FEF3C7', color: item.grossNeed > 0 ? '#B91C1C' : '#92400E' }">
+              {{ e(item.menuId) }} {{ item.menuName }}
+              <span v-if="item.grossNeed > 0" style="color: #DC2626;">(pesanan {{ item.grossNeed }} pcs)</span>
+            </span>
+          </div>
+        </div>
+      </template>
+
+      <!-- Ringkasan Stok PO -->
+      <div class="rounded-2xl border p-3.5" style="background: var(--color-blue-50); border-color: var(--color-blue-100);">
+        <div class="grid grid-cols-3 gap-2 text-center">
+          <div>
+            <div class="text-[10px] font-semibold" style="color: var(--color-ink-500);">Stok Dipakai</div>
+            <div class="font-display text-lg font-bold" style="color: var(--color-blue-700);">{{ totalDipakai }} pcs</div>
+          </div>
+          <div>
+            <div class="text-[10px] font-semibold" style="color: var(--color-ink-500);">Sisa Stok</div>
+            <div class="font-display text-lg font-bold" style="color: var(--color-green-700);">{{ totalSisa }} pcs</div>
+          </div>
+          <div>
+            <div class="text-[10px] font-semibold" style="color: var(--color-ink-500);">Perlu Dibeli</div>
+            <div class="font-display text-lg font-bold" style="color: #D44B4B;">{{ totalKurang }} pcs</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Kebutuhan per Menu -->
       <div class="flex items-center gap-2.5">
         <div class="flex h-8 w-8 items-center justify-center rounded-xl text-sm" style="background: var(--color-blue-100);">🧮</div>
-        <span class="font-display text-base font-semibold" style="color: var(--color-ink-900);">Kebutuhan per Menu</span>
-        <span class="ml-auto rounded-full px-2 py-0.5 text-xs font-bold" style="background: var(--color-blue-100); color: var(--color-blue-700);">{{ result.needs.filter(n => n.grossNeed > 0).length }} menu</span>
+        <span class="font-display text-base font-semibold" style="color: var(--color-ink-900);">Detail per Menu</span>
+        <span class="ml-auto rounded-full px-2 py-0.5 text-xs font-bold" style="background: var(--color-blue-100); color: var(--color-blue-700);">{{ visibleNeeds.length }} menu</span>
       </div>
       <div class="rounded-2xl border bg-white px-4 py-2" style="border-color: var(--color-blue-100);">
         <div class="flex items-center border-b py-2 text-[10px] font-bold" style="color: var(--color-ink-500); border-color: var(--color-blue-100);">
@@ -208,22 +251,18 @@ async function fetchHpp() {
           <span class="w-12 text-right">Stok</span>
           <span class="w-12 text-right">Dipakai</span>
           <span class="w-12 text-right">Sisa</span>
-          <span class="w-14 text-right font-bold" style="color: var(--color-blue-700);">Kurang</span>
+          <span class="w-14 text-right font-bold" style="color: var(--color-blue-700);">Beli</span>
         </div>
-        <div v-for="need in result.needs.filter(n => n.grossNeed > 0)" :key="need.menuId"
-          class="flex items-center border-b py-2.5 text-sm" style="border-color: var(--color-blue-50);">
+        <div v-for="need in visibleNeeds" :key="need.menuId"
+          class="flex items-center border-b py-2.5 text-sm" style="border-color: var(--color-blue-50);"
+          :style="{ background: need.netNeed > 0 ? '#FEF2F2' : 'transparent' }">
           <span class="w-6 text-base shrink-0">{{ e(need.menuId) }}</span>
           <span class="flex-1 font-semibold min-w-0 truncate" style="color: var(--color-ink-900);">{{ need.menuName }}</span>
           <span class="w-12 text-right font-semibold" style="color: var(--color-ink-500);">{{ need.grossNeed }}</span>
-          <span class="w-12 text-right font-semibold" :style="{ color: need.stockOnHand > 0 ? 'var(--color-green-600)' : 'var(--color-ink-500)' }">{{ need.stockOnHand || '-' }}</span>
+          <span class="w-12 text-right font-semibold" :style="{ color: need.stockOnHand > 0 ? 'var(--color-green-600)' : '#DC2626' }">{{ need.stockOnHand || '0' }}</span>
           <span class="w-12 text-right font-semibold" style="color: var(--color-ink-600);">{{ need.stockOnHand > 0 ? Math.min(need.grossNeed, need.stockOnHand) : '-' }}</span>
           <span class="w-12 text-right font-semibold" :style="{ color: need.stockOnHand > need.grossNeed ? 'var(--color-green-600)' : 'var(--color-ink-500)' }">{{ need.stockOnHand > need.grossNeed ? need.stockOnHand - need.grossNeed : '-' }}</span>
-          <span class="w-14 text-right font-bold" :style="{ color: need.netNeed > 0 ? '#D44B4B' : 'var(--color-green-600)' }">{{ need.netNeed > 0 ? need.netNeed : '✓' }}</span>
-        </div>
-        <div class="flex items-center justify-between py-2 text-xs font-semibold" style="color: var(--color-ink-500);">
-          <span>Stok terpakai: {{ result.needs.reduce((s, n) => s + Math.min(n.grossNeed, n.stockOnHand), 0) }} pcs</span>
-          <span>Sisa stok: {{ result.needs.reduce((s, n) => s + Math.max(0, n.stockOnHand - n.grossNeed), 0) }} pcs</span>
-          <span style="color: #D44B4B;">Kurang: {{ result.needs.reduce((s, n) => s + n.netNeed, 0) }} pcs</span>
+          <span class="w-14 text-right font-bold" :style="{ color: need.netNeed > 0 ? '#DC2626' : '#16A34A' }">{{ need.netNeed > 0 ? need.netNeed : '✔' }}</span>
         </div>
       </div>
 
