@@ -23,6 +23,7 @@ export const usePoStore = defineStore('po', () => {
           id: c.id,
           name: c.name,
           shippingFee: c.shippingFee ?? 0,
+          discount: c.discount ?? 0,
           paid: c.paid,
           shipped: c.shipped,
           items: (c.items || []).map((i: any) => ({
