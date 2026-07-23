@@ -7,6 +7,10 @@ export default defineNuxtConfig({
     '@nuxt/icon',
   ],
 
+  ui: {
+    colorMode: false,
+  },
+
   app: {
     head: {
       charset: 'utf-8',

@@ -1,7 +1,13 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
 
-/* Delulu design tokens */
+/* Force light mode — override any dark variant from system/user */
+html.dark,
+html.dark body {
+  color-scheme: light;
+}
+
+/* Delulul design tokens */
 @theme {
   --color-cream-50: #FFFBF0;
   --color-cream-100: #FFF4D9;
