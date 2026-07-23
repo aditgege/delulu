@@ -27,7 +27,6 @@ onMounted(async () => {
     pkgStore.ensureLoaded(),
     invStore.ensureLoaded(),
     poStore.ensureLoaded(),
-    fetchHpp(),
   ])
   const po = poStore.getOrderById(poId.value)
   if (!po) {
