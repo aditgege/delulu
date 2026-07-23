@@ -6,7 +6,7 @@ import {
 } from './optimizer'
 import { PORSI_PCS } from '~/types'
 import type {
-  Package, SupplierMix, Menu, InventoryEntry, OrderLine, BakarKukusLine,
+  Product, ProductComposition, SupplierMix, Menu, InventoryEntry, OrderLine,
   SupplierPack, MenuNeed,
 } from '~/types'
 
@@ -25,32 +25,29 @@ const MENUS: Menu[] = [
 
 const mem = (id: string) => MENUS.find(m => m.id === id)!
 
-// ─── Fixtures: 3 frozen packages ───
-const PACKAGES: Package[] = [
-  {
-    id: 'paket-halu', name: 'Paket Halu', price: 35000,
-    bom: [
-      { menuId: 'siomay-ayam', qty: 2 }, { menuId: 'lumpia-kulit-tahu-udang', qty: 2 },
-      { menuId: 'siomay-nori', qty: 2 }, { menuId: 'siomay-kepiting', qty: 2 },
-      { menuId: 'hisitkau', qty: 2 },
-    ],
-  },
-  {
-    id: 'paket-when-ya', name: 'Paket When Ya', price: 35000,
-    bom: [
-      { menuId: 'siomay-udang', qty: 2 }, { menuId: 'lumpia-kulit-tahu-ayam', qty: 2 },
-      { menuId: 'siomay-nori', qty: 2 }, { menuId: 'siomay-seafood', qty: 2 },
-      { menuId: 'hisitkau', qty: 2 },
-    ],
-  },
-  {
-    id: 'paket-solulu', name: 'Paket Solulu', price: 35000,
-    bom: [
-      { menuId: 'siomay-ayam', qty: 2 }, { menuId: 'lumpia-kulit-tahu-ayam', qty: 2 },
-      { menuId: 'siomay-nori', qty: 2 }, { menuId: 'siomay-kepiting', qty: 2 },
-      { menuId: 'siomay-mozzarella', qty: 2 },
-    ],
-  },
+// ─── Fixtures: 3 frozen bundle products ───
+const PRODUCTS: Product[] = [
+  { id: 'paket-halu', name: 'Paket Halu', unit: 'paket', type: 'bundle', basePrice: 35000 },
+  { id: 'paket-when-ya', name: 'Paket When Ya', unit: 'paket', type: 'bundle', basePrice: 35000 },
+  { id: 'paket-solulu', name: 'Paket Solulu', unit: 'paket', type: 'bundle', basePrice: 35000 },
+]
+
+const COMPOSITIONS: ProductComposition[] = [
+  { productId: 'paket-halu', menuId: 'siomay-ayam', qty: 2 },
+  { productId: 'paket-halu', menuId: 'lumpia-kulit-tahu-udang', qty: 2 },
+  { productId: 'paket-halu', menuId: 'siomay-nori', qty: 2 },
+  { productId: 'paket-halu', menuId: 'siomay-kepiting', qty: 2 },
+  { productId: 'paket-halu', menuId: 'hisitkau', qty: 2 },
+  { productId: 'paket-when-ya', menuId: 'siomay-udang', qty: 2 },
+  { productId: 'paket-when-ya', menuId: 'lumpia-kulit-tahu-ayam', qty: 2 },
+  { productId: 'paket-when-ya', menuId: 'siomay-nori', qty: 2 },
+  { productId: 'paket-when-ya', menuId: 'siomay-seafood', qty: 2 },
+  { productId: 'paket-when-ya', menuId: 'hisitkau', qty: 2 },
+  { productId: 'paket-solulu', menuId: 'siomay-ayam', qty: 2 },
+  { productId: 'paket-solulu', menuId: 'lumpia-kulit-tahu-ayam', qty: 2 },
+  { productId: 'paket-solulu', menuId: 'siomay-nori', qty: 2 },
+  { productId: 'paket-solulu', menuId: 'siomay-kepiting', qty: 2 },
+  { productId: 'paket-solulu', menuId: 'siomay-mozzarella', qty: 2 },
 ]
 
 // ─── Fixtures: 3 supplier mixes ───
@@ -117,25 +114,24 @@ const INVENTORY: InventoryEntry[] = [
 ]
 
 // ─── Scenario: 10 frozen (Halu 3, When Ya 4, Solulu 3) + 8 porsi matang ───
-const SCENARIO_FROZEN_LINES: OrderLine[] = [
-  { packageId: 'paket-halu', qty: 3 },
-  { packageId: 'paket-when-ya', qty: 4 },
-  { packageId: 'paket-solulu', qty: 3 },
-]
-
-const SCENARIO_BAKAR_KUKUS_LINES: BakarKukusLine[] = [
-  { menuId: 'siomay-nori', caraMasak: 'bakar', jumlahPorsi: 2 },
-  { menuId: 'siomay-mozzarella', caraMasak: 'bakar', jumlahPorsi: 2 },
-  { menuId: 'siomay-ayam', caraMasak: 'kukus', jumlahPorsi: 2 },
-  { menuId: 'lumpia-kulit-tahu-ayam', caraMasak: 'bakar', jumlahPorsi: 1 },
-  { menuId: 'siomay-mozzarella', caraMasak: 'kukus', jumlahPorsi: 1 },
+const SCENARIO_ITEMS: OrderLine[] = [
+  // Frozen bundles
+  { productId: 'paket-halu', qty: 3, unitPrice: 35000 },
+  { productId: 'paket-when-ya', qty: 4, unitPrice: 35000 },
+  { productId: 'paket-solulu', qty: 3, unitPrice: 35000 },
+  // Bakar/kukus
+  { productId: 'siomay-nori', variant: 'bakar', qty: 2, unitPrice: 18000 },
+  { productId: 'siomay-mozzarella', variant: 'bakar', qty: 2, unitPrice: 18000 },
+  { productId: 'siomay-ayam', variant: 'kukus', qty: 2, unitPrice: 16000 },
+  { productId: 'lumpia-kulit-tahu-ayam', variant: 'bakar', qty: 1, unitPrice: 18000 },
+  { productId: 'siomay-mozzarella', variant: 'kukus', qty: 1, unitPrice: 16000 },
 ]
 
 // ============================================================================
 // TEST 1: computeNeeds — grossNeed per menu
 // ============================================================================
 describe('computeNeeds — scenario 10 frozen + 8 matang', () => {
-  const needs = computeNeeds(SCENARIO_FROZEN_LINES, SCENARIO_BAKAR_KUKUS_LINES, PACKAGES, MENUS, INVENTORY)
+  const needs = computeNeeds(SCENARIO_ITEMS, COMPOSITIONS, MENUS, INVENTORY)
 
   it('total grossNeed = 132 pcs', () => {
     const total = needs.reduce((s, n) => s + n.grossNeed, 0)
@@ -229,7 +225,7 @@ describe('computeNeeds — scenario 10 frozen + 8 matang', () => {
 // TEST 2: optimizeMixes — harus nemu Mix A×1 + Mix B×1 + Mix E×2
 // ============================================================================
 describe('optimizeMixes — scenario 10 frozen + 8 matang', () => {
-  const needs = computeNeeds(SCENARIO_FROZEN_LINES, SCENARIO_BAKAR_KUKUS_LINES, PACKAGES, MENUS, INVENTORY)
+  const needs = computeNeeds(SCENARIO_ITEMS, COMPOSITIONS, MENUS, INVENTORY)
   const mixOption = optimizeMixes(needs, MIXES)
 
   it('finds a valid mix combination', () => {
@@ -263,14 +259,14 @@ describe('optimizeMixes — scenario 10 frozen + 8 matang', () => {
 
   it('Siomay Ayam provision = 18 (from A×1 + E×2)', () => {
     // Mix A = Ayam 6, Mix E×2 = Ayam 12 → 18
-    const mixRec = buildMixRecommendation(needs, MIXES, mixOption!, PACKAGES)
+    const mixRec = buildMixRecommendation(needs, MIXES, mixOption!, PRODUCTS, COMPOSITIONS)
     const ayam = mixRec.skuDetails.find(d => d.menuId === 'siomay-ayam')
     expect(ayam).toBeDefined()
     expect(ayam!.provided).toBe(18) // 6(A) + 12(E)
   })
 
   it('Siomay Nori provision = 24 (from A×1 + B×1 + E×2)', () => {
-    const mixRec = buildMixRecommendation(needs, MIXES, mixOption!, PACKAGES)
+    const mixRec = buildMixRecommendation(needs, MIXES, mixOption!, PRODUCTS, COMPOSITIONS)
     const nori = mixRec.skuDetails.find(d => d.menuId === 'siomay-nori')
     expect(nori).toBeDefined()
     expect(nori!.provided).toBe(24) // 6(A) + 6(B) + 12(E)
@@ -283,8 +279,8 @@ describe('optimizeMixes — scenario 10 frozen + 8 matang', () => {
 // ============================================================================
 describe('computeFullRecommendation — end-to-end', () => {
   const result = computeFullRecommendation(
-    SCENARIO_FROZEN_LINES, SCENARIO_BAKAR_KUKUS_LINES,
-    PACKAGES, MENUS, INVENTORY, SUPPLIER_PACKS, MIXES,
+    SCENARIO_ITEMS,
+    PRODUCTS, COMPOSITIONS, MENUS, INVENTORY, SUPPLIER_PACKS, MIXES,
   )
 
   it('mix recommendation exists', () => {
@@ -328,7 +324,7 @@ describe('computeFullRecommendation — end-to-end', () => {
 // TEST 4: sisaPerMenu = stockOnHand + provision - grossNeed (mirror of UI)
 // ============================================================================
 describe('sisa per menu (stock + provision - grossNeed)', () => {
-  const needs = computeNeeds(SCENARIO_FROZEN_LINES, SCENARIO_BAKAR_KUKUS_LINES, PACKAGES, MENUS, INVENTORY)
+  const needs = computeNeeds(SCENARIO_ITEMS, COMPOSITIONS, MENUS, INVENTORY)
   const mixOption = optimizeMixes(needs, MIXES)!
 
   // Build provision map
@@ -425,18 +421,18 @@ describe('buildMenuRecommendations', () => {
 // ============================================================================
 describe('edge cases', () => {
   it('frozen only — mix still works', () => {
-    const lines: OrderLine[] = [{ packageId: 'paket-halu', qty: 5 }]
-    const needs = computeNeeds(lines, [], PACKAGES, MENUS, INVENTORY)
+    const lines: OrderLine[] = [{ productId: 'paket-halu', qty: 5, unitPrice: 35000 }]
+    const needs = computeNeeds(lines, COMPOSITIONS, MENUS, INVENTORY)
     const mix = optimizeMixes(needs, MIXES)
     expect(mix).not.toBeNull()
     expect(mix!.counts['mix-a']).toBeGreaterThan(0)
   })
 
   it('kukus only — mix still works', () => {
-    const lines: BakarKukusLine[] = [
-      { menuId: 'siomay-ayam', caraMasak: 'kukus', jumlahPorsi: 5 },
+    const lines: OrderLine[] = [
+      { productId: 'siomay-ayam', variant: 'kukus', qty: 5, unitPrice: 16000 },
     ]
-    const needs = computeNeeds([], lines, PACKAGES, MENUS, INVENTORY)
+    const needs = computeNeeds(lines, COMPOSITIONS, MENUS, INVENTORY)
     const mix = optimizeMixes(needs, MIXES)
     expect(mix).not.toBeNull()
     // Mix A×3 or Mix E×3 — either covers netNeed 14 (stock 6, need 20)
@@ -445,7 +441,7 @@ describe('edge cases', () => {
   })
 
   it('zero orders → all netNeed = 0', () => {
-    const needs = computeNeeds([], [], PACKAGES, MENUS, INVENTORY)
+    const needs = computeNeeds([], COMPOSITIONS, MENUS, INVENTORY)
     const totalNet = needs.reduce((s, n) => s + n.netNeed, 0)
     expect(totalNet).toBe(0)
   })
@@ -454,8 +450,8 @@ describe('edge cases', () => {
     // Give huge stock
     const hugeInv: InventoryEntry[] = INVENTORY.map(i => ({ ...i, qtyOnHand: 999 }))
     const result = computeFullRecommendation(
-      SCENARIO_FROZEN_LINES, SCENARIO_BAKAR_KUKUS_LINES,
-      PACKAGES, MENUS, hugeInv, SUPPLIER_PACKS, MIXES,
+      SCENARIO_ITEMS,
+      PRODUCTS, COMPOSITIONS, MENUS, hugeInv, SUPPLIER_PACKS, MIXES,
     )
     expect(result.mixRecommendation).toBeNull()
     expect(result.individualRecommendations.length).toBe(0)

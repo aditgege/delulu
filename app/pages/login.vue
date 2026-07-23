@@ -26,7 +26,7 @@ async function submit() {
     <div class="w-full max-w-sm">
       <div class="rounded-2xl border p-6 text-center" style="background: var(--color-cream-100); border-color: var(--color-cream-200);">
         <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl text-2xl" style="background: linear-gradient(135deg, var(--color-blue-300), var(--color-blue-500)); box-shadow: 0 4px 12px rgba(79, 168, 224, 0.3);">🧊</div>
-        <h1 class="font-display text-xl font-bold" style="color: var(--color-ink-900);">StokCeria</h1>
+        <h1 class="font-display text-xl font-bold" style="color: var(--color-ink-900);">Delulu</h1>
         <p class="mt-1 text-sm font-semibold" style="color: var(--color-ink-500);">Masukkan PIN untuk melanjutkan</p>
       </div>
 

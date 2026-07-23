@@ -1,5 +1,5 @@
 import type {
-  OrderLine, BakarKukusLine, Package, Menu, InventoryEntry, SupplierPack, SupplierMix,
+  OrderLine, Product, ProductComposition, Menu, InventoryEntry, SupplierPack, SupplierMix,
   MenuNeed, PackOption, MenuRecommendation, PurchaseRecommendation,
   MixOption, MixMenuRecommendation, MixRecommendation,
 } from '~/types'
@@ -7,41 +7,28 @@ import { PORSI_PCS } from '~/types'
 
 // ——— Mix Paket Optimization ———
 
-/**
- * Find optimal combination of Mix Pakets (A, B, C, E) to cover per-Menu needs.
- *
- * Brute-force over 4 variables. For each mix, bound = ceil(maxNeed / 6).
- * With realistic needs < 200 pcs, max ≈ 34 per mix → 34⁴ ≈ 1.3M iterations.
- */
 export function optimizeMixes(
   needs: MenuNeed[],
   mixes: SupplierMix[],
 ): MixOption | null {
-  // Build per-Menu net need map
   const needMap = new Map(needs.filter(n => n.netNeed > 0).map(n => [n.menuId, n.netNeed]))
 
-  // Build mix "contents" matrix: for each mix, what it provides per Menu
   const mixIds = mixes.map(m => m.id)
   const mixData = mixes.map(m => {
     const prov = new Map(m.contents.map(c => [c.menuId, c.qty]))
     return { id: m.id, price: m.price, prov }
   })
 
-  // Determine which Menus are covered by at least one mix
   const coveredMenus = new Set<string>()
   for (const mix of mixes) {
     for (const c of mix.contents) coveredMenus.add(c.menuId)
   }
 
-  // Only optimize Menus that are both needed AND covered by mixes
   const relevantMenus = [...coveredMenus].filter(s => needMap.has(s))
   if (relevantMenus.length === 0) return null
 
-  // Bound: max of each mix = ceil(max need for any relevant Menu / 6)
   const maxNeed = Math.max(...relevantMenus.map(s => needMap.get(s)!))
   const maxPerMix = Math.ceil(maxNeed / 6)
-
-  // Performance guard: cap at 100 per mix to prevent browser freeze
   const bound = Math.min(maxPerMix, 100)
   if (bound < maxPerMix) {
     console.warn(
@@ -105,18 +92,15 @@ export function optimizeMixes(
       }
     }
   }
-
   return best
 }
 
-/**
- * Build Mix recommendation details from a MixOption.
- */
 export function buildMixRecommendation(
   needs: MenuNeed[],
   mixes: SupplierMix[],
   mixOption: MixOption,
-  packages: Package[],
+  products: Product[],
+  allCompositions: ProductComposition[],
 ): MixRecommendation {
   const needMap = new Map(needs.map(n => [n.menuId, n]))
 
@@ -142,7 +126,7 @@ export function buildMixRecommendation(
     })
   }
 
-  const wasteBonus = optimizeWasteToPackages(mixOption.wastePerSku, packages)
+  const wasteBonus = optimizeWasteToPackages(mixOption.wastePerSku, products, allCompositions)
 
   return {
     mixes: mixList,
@@ -153,7 +137,7 @@ export function buildMixRecommendation(
   }
 }
 
-// ——— Waste-to-Packages Optimization ———
+// ——— Waste-to-Products Optimization ———
 
 export interface WastePackageResult {
   counts: Record<string, number>
@@ -163,18 +147,25 @@ export interface WastePackageResult {
 
 export function optimizeWasteToPackages(
   wastePerSku: Record<string, number>,
-  packages: Package[],
+  products: Product[],
+  allCompositions: ProductComposition[],
   targetIds?: string[],
 ): WastePackageResult | null {
-  const pkgs = targetIds
-    ? packages.filter(p => targetIds.includes(p.id))
-    : packages
-  if (pkgs.length === 0) return null
+  const bundleIds = targetIds
+    ? products.filter(p => targetIds.includes(p.id) && p.type === 'bundle').map(p => p.id)
+    : products.filter(p => p.type === 'bundle').map(p => p.id)
+
+  const bundles = bundleIds.map(id => ({
+    id,
+    bom: allCompositions.filter(c => c.productId === id),
+  }))
+
+  if (bundles.length === 0) return null
 
   const startWaste = Object.values(wastePerSku).reduce((s, n) => s + n, 0)
   if (startWaste === 0) return null
 
-  const maxPerPkg = pkgs.map(pkg => {
+  const maxPerPkg = bundles.map(pkg => {
     let max = Infinity
     for (const b of pkg.bom) {
       const avail = wastePerSku[b.menuId] || 0
@@ -203,7 +194,7 @@ export function optimizeWasteToPackages(
     const pkg = maxPerPkg[index]!
     for (let n = 0; n <= pkg.max; n++) {
       const newRemaining = { ...remaining }
-      const pkgDef = pkgs.find(p => p.id === pkg.id)
+      const pkgDef = bundles.find(p => p.id === pkg.id)
       if (pkgDef) {
         for (const b of pkgDef.bom) {
           newRemaining[b.menuId] = (newRemaining[b.menuId] || 0) - n * b.qty
@@ -268,7 +259,6 @@ export function buildMenuRecommendations(
   }
 
   const recommendations: MenuRecommendation[] = []
-
   for (const need of needs) {
     if (need.netNeed <= 0) continue
     if (skipMenus.has(need.menuId)) continue
@@ -277,7 +267,6 @@ export function buildMenuRecommendations(
     if (!packs || packs.length === 0) continue
 
     let chosen: PackOption | null = null
-
     if (packs.length === 1) {
       const pack: SupplierPack = packs[0]!
       const count = Math.ceil(need.netNeed / pack.sizePcs)
@@ -303,36 +292,47 @@ export function buildMenuRecommendations(
       recommendations.push({ menuId: need.menuId, menuName: need.menuName, netNeed: need.netNeed, chosenPack: chosen })
     }
   }
-
   return recommendations
 }
 
-// ——— Per-Menu Need Computation ———
+// ——— Per-Menu Need Computation (unified items) ———
 
 export function computeNeeds(
-  orderLines: OrderLine[],
-  bakarKukusLines: BakarKukusLine[],
-  packages: Package[],
+  items: OrderLine[],
+  compositions: ProductComposition[],
   menus: Menu[],
   inventory: InventoryEntry[],
 ): MenuNeed[] {
   const invMap = new Map(inventory.map(i => [i.menuId, i.qtyOnHand]))
-  const pkgMap = new Map(packages.map(p => [p.id, p]))
   const menuMap = new Map(menus.map(s => [s.id, s]))
 
-  const grossMap = new Map<string, number>()
-  for (const line of orderLines) {
-    const pkg = pkgMap.get(line.packageId)
-    if (!pkg) continue
-    for (const bom of pkg.bom) {
-      grossMap.set(bom.menuId, (grossMap.get(bom.menuId) || 0) + bom.qty * line.qty)
-    }
+  // Build BOM lookup: for each productId → its menu breakdown
+  const bomMap = new Map<string, ProductComposition[]>()
+  for (const c of compositions) {
+    if (!bomMap.has(c.productId)) bomMap.set(c.productId, [])
+    bomMap.get(c.productId)!.push(c)
   }
 
-  for (const line of bakarKukusLines) {
-    const menuId = line.menuId
-    const pcsNeed = line.jumlahPorsi * PORSI_PCS
-    grossMap.set(menuId, (grossMap.get(menuId) || 0) + pcsNeed)
+  const grossMap = new Map<string, number>()
+  const bkVariants = new Set(['bakar', 'kukus'])
+
+  for (const item of items) {
+    const bom = bomMap.get(item.productId)
+    const variant = item.variant?.toLowerCase()
+
+    if (bom) {
+      // Bundle frozen — explode BOM
+      for (const b of bom) {
+        grossMap.set(b.menuId, (grossMap.get(b.menuId) || 0) + b.qty * item.qty)
+      }
+    } else if (variant && bkVariants.has(variant)) {
+      // Bakar/kukus — qty is jumlahPorsi, convert to pcs
+      const pcsNeed = item.qty * PORSI_PCS
+      grossMap.set(item.productId, (grossMap.get(item.productId) || 0) + pcsNeed)
+    } else {
+      // Single/addon — qty as-is
+      grossMap.set(item.productId, (grossMap.get(item.productId) || 0) + item.qty)
+    }
   }
 
   const needs: MenuNeed[] = []
@@ -345,18 +345,18 @@ export function computeNeeds(
   return needs
 }
 
-// ——— Full Computation ———
+// ——— Full Computation (unified items) ———
 
 export function computeFullRecommendation(
-  orderLines: OrderLine[],
-  bakarKukusLines: BakarKukusLine[],
-  packages: Package[],
+  items: OrderLine[],
+  products: Product[],
+  allCompositions: ProductComposition[],
   menus: Menu[],
   inventory: InventoryEntry[],
   supplierPacks: SupplierPack[],
   mixes: SupplierMix[],
 ): PurchaseRecommendation {
-  const needs = computeNeeds(orderLines, bakarKukusLines, packages, menus, inventory)
+  const needs = computeNeeds(items, allCompositions, menus, inventory)
 
   const mixCoveredMenus = new Set<string>()
   for (const mix of mixes) {
@@ -366,7 +366,7 @@ export function computeFullRecommendation(
   const mixOption = optimizeMixes(needs, mixes)
   let mixRecommendation: MixRecommendation | null = null
   if (mixOption) {
-    mixRecommendation = buildMixRecommendation(needs, mixes, mixOption, packages)
+    mixRecommendation = buildMixRecommendation(needs, mixes, mixOption, products, allCompositions)
   } else {
     mixCoveredMenus.clear()
   }
@@ -382,7 +382,7 @@ export function computeFullRecommendation(
     individualRecommendations.reduce((s, r) => s + r.chosenPack.waste, 0)
 
   return {
-    lines: orderLines,
+    lines: items,
     needs,
     mixRecommendation,
     individualRecommendations,

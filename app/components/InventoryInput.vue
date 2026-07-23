@@ -5,9 +5,12 @@ import { usePackageStore } from '~/stores/packages'
 const invStore = useInventoryStore()
 const pkgStore = usePackageStore()
 const skus = computed(() => pkgStore.getAllMenus())
-const isOpen = ref(false)
 const search = ref('')
-const expandedCats = ref<Set<string>>(new Set())
+
+// Delete confirmation
+const showDeleteDrawer = ref(false)
+const deleteAction = ref<(() => void) | null>(null)
+const deleteLabel = ref('')
 
 const emojiMap: Record<string, string> = {
   'siomay-ayam': '🥟', 'siomay-udang': '🍤', 'siomay-kepiting': '🦀',
@@ -57,13 +60,6 @@ function hasValue(catId: string): boolean {
   return groupedSkus.value.get(catId)?.some(s => invStore.getStock(s.id) > 0) ?? false
 }
 
-function toggleCat(id: string) {
-  const next = new Set(expandedCats.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  expandedCats.value = next
-}
-
 function inc(id: string) { invStore.setStock(id, invStore.getStock(id) + 1) }
 function inc10(id: string) { invStore.setStock(id, invStore.getStock(id) + 10) }
 function dec(id: string) { invStore.setStock(id, Math.max(0, invStore.getStock(id) - 1)) }
@@ -73,10 +69,28 @@ function onInput(id: string, e: Event) {
   invStore.setStock(id, isNaN(val) ? 0 : val)
 }
 
-function clearCategory(catId: string) {
-  for (const sku of groupedSkus.value.get(catId) || []) {
-    invStore.setStock(sku.id, 0)
+// ── Confirmation helpers ──
+function confirmClearCategory(catId: string) {
+  const cat = categories.find(c => c.id === catId)
+  deleteLabel.value = `Kosongkan stok ${cat?.name || ''}?`
+  deleteAction.value = () => {
+    for (const sku of groupedSkus.value.get(catId) || []) invStore.setStock(sku.id, 0)
   }
+  showDeleteDrawer.value = true
+}
+
+function confirmClearAll() {
+  deleteLabel.value = 'Reset semua stok ke 0?'
+  deleteAction.value = () => {
+    for (const sku of skus.value) invStore.setStock(sku.id, 0)
+  }
+  showDeleteDrawer.value = true
+}
+
+function executeDelete() {
+  deleteAction.value?.()
+  showDeleteDrawer.value = false
+  deleteAction.value = null
 }
 
 function fillCategory(catId: string, val: number) {
@@ -85,42 +99,25 @@ function fillCategory(catId: string, val: number) {
   }
 }
 
-function clearAll() {
-  for (const sku of skus.value) invStore.setStock(sku.id, 0)
-}
-
 function e(skuId: string) { return emojiMap[skuId] || '📦' }
 
 const totalFilled = computed(() => skus.value.filter(s => invStore.getStock(s.id) > 0).length)
 const totalAll = computed(() => skus.value.length)
-const allCollapsed = computed(() => expandedCats.value.size === 0)
+const totalStockQty = computed(() => skus.value.reduce((s, sku) => s + invStore.getStock(sku.id), 0))
 const someFilled = computed(() => totalFilled.value > 0)
 </script>
 
 <template>
   <div class="rounded-2xl border" style="border-color: var(--color-blue-100);">
-    <!-- Header -->
-    <button
-      class="flex w-full items-center gap-2 px-4 py-3 text-sm font-bold transition-colors"
-      style="color: var(--color-ink-700);"
-      @click="isOpen = !isOpen"
-    >
-      📦 Atur Stok Awal <span class="text-xs font-semibold" style="color: var(--color-ink-500);">(opsional)</span>
-      <span v-if="someFilled" class="ml-1 rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style="background: var(--color-blue-500);">
-        {{ totalFilled }}/{{ totalAll }}
-      </span>
-      <span class="ml-auto transition-transform" :class="isOpen ? 'rotate-180' : ''">▾</span>
-    </button>
-
-    <div v-if="isOpen" class="border-t px-4 pb-4 pt-3 space-y-3" style="border-color: var(--color-blue-100);">
-      <!-- Description + quick actions -->
+    <div class="px-4 pb-4 pt-3 space-y-3">
+      <!-- Description -->
       <div class="flex items-center justify-between gap-2">
         <div class="text-xs font-semibold" style="color: var(--color-ink-500);">Sisa produksi kemarin? Isi stok biar dikurangi dari pembelian.</div>
         <button
           v-if="someFilled"
           class="shrink-0 rounded-lg px-2 py-1 text-[10px] font-bold"
           style="background: #FAD3D3; color: #B14343;"
-          @click="clearAll"
+          @click="confirmClearAll()"
         >↻ Reset semua</button>
       </div>
 
@@ -142,31 +139,19 @@ const someFilled = computed(() => totalFilled.value > 0)
         >✕</button>
       </div>
 
-      <!-- Collapse all / Expand all -->
-      <div class="flex gap-2">
-        <button
-          class="rounded-lg px-2.5 py-1 text-[10px] font-bold"
-          style="background: var(--color-blue-50); color: var(--color-blue-700);"
-          @click="expandedCats = new Set(allCollapsed ? categories.map(c => c.id) : [])"
-        >{{ allCollapsed ? '🔽 Buka semua' : '🔼 Tutup semua' }}</button>
-      </div>
-
       <!-- Category groups -->
       <div class="space-y-2">
         <div
           v-for="cat in categories"
           :key="cat.id"
-          class="rounded-xl border overflow-hidden transition-all"
+          class="rounded-xl border overflow-hidden"
           :style="{
             background: hasValue(cat.id) ? 'var(--color-blue-50)' : 'white',
             borderColor: hasValue(cat.id) ? 'var(--color-blue-200)' : 'var(--color-blue-100)',
           }"
         >
           <!-- Category header -->
-          <button
-            class="flex w-full items-center gap-2 px-3 py-2.5 text-left active:scale-[0.99]"
-            @click="toggleCat(cat.id)"
-          >
+          <div class="flex items-center gap-2 px-3 py-2.5">
             <span class="text-lg">{{ cat.emoji }}</span>
             <span class="font-display text-sm font-bold" style="color: var(--color-ink-900);">{{ cat.name }}</span>
             <span
@@ -177,26 +162,24 @@ const someFilled = computed(() => totalFilled.value > 0)
               }"
             >{{ filledCount(cat.id) }}/{{ totalCount(cat.id) }}</span>
 
-            <!-- Quick actions (visible when collapsed or expanded) -->
-            <div class="ml-auto flex items-center gap-1" @click.stop>
+            <div class="ml-auto flex items-center gap-1">
               <button
                 v-if="hasValue(cat.id)"
                 class="rounded-lg px-1.5 py-0.5 text-[10px] font-bold"
                 style="color: #B14343;"
-                @click="clearCategory(cat.id)"
+                @click="confirmClearCategory(cat.id)"
               >Kosongkan</button>
               <button
-                v-if="!hasValue(cat.id) && expandedCats.has(cat.id)"
+                v-if="!hasValue(cat.id)"
                 class="rounded-lg px-1.5 py-0.5 text-[10px] font-bold"
                 style="color: var(--color-blue-600);"
                 @click="fillCategory(cat.id, 10)"
               >Isi 10</button>
-              <span class="ml-1 text-xs transition-transform" :class="expandedCats.has(cat.id) ? 'rotate-180' : ''">▾</span>
             </div>
-          </button>
+          </div>
 
-          <!-- SKU rows (expanded) -->
-          <div v-if="expandedCats.has(cat.id) && groupedSkus.get(cat.id)!.length > 0" class="border-t px-3 pb-2 pt-1" style="border-color: var(--color-blue-100);">
+          <!-- SKU rows -->
+          <div class="border-t px-3 pb-2 pt-1" style="border-color: var(--color-blue-100);">
             <div
               v-for="sku in groupedSkus.get(cat.id)"
               :key="sku.id"
@@ -241,21 +224,34 @@ const someFilled = computed(() => totalFilled.value > 0)
               >+10</button>
             </div>
           </div>
-
-          <!-- Empty state -->
-          <div v-else-if="expandedCats.has(cat.id) && groupedSkus.get(cat.id)!.length === 0" class="px-3 pb-2 pt-1 text-center text-[10px] font-semibold" style="color: var(--color-ink-500);">
-            (kosong)
-          </div>
         </div>
       </div>
 
       <!-- Footer summary -->
       <div v-if="someFilled" class="flex items-center justify-between rounded-xl border px-3 py-2" style="border-color: var(--color-blue-200); background: white;">
-        <span class="text-xs font-semibold" style="color: var(--color-ink-500);">Total terisi</span>
-        <span class="font-display text-sm font-bold" style="color: var(--color-blue-700);">
-          {{ totalFilled }} / {{ totalAll }} bahan
-        </span>
+        <div>
+          <span class="text-xs font-semibold" style="color: var(--color-ink-500);">Total terisi</span>
+          <span class="ml-2 font-display text-sm font-bold" style="color: var(--color-blue-700);">{{ totalFilled }} / {{ totalAll }} bahan</span>
+        </div>
+        <span class="font-display text-sm font-bold" style="color: var(--color-green-700);">{{ totalStockQty }} pcs</span>
       </div>
     </div>
+
+    <!-- ═══ Delete Confirmation Drawer ═══ -->
+    <UDrawer v-model:open="showDeleteDrawer" title="Konfirmasi" direction="bottom" dismissible close>
+      <template #body>
+        <div class="py-6 text-center space-y-4">
+          <div class="text-4xl">🗑️</div>
+          <div>
+            <div class="font-display text-base font-bold" style="color: var(--color-ink-900);">{{ deleteLabel }}</div>
+            <div class="text-xs font-semibold mt-1" style="color: var(--color-ink-500);">Stok yang dikosongkan tidak bisa dikembalikan (kecuali diisi manual).</div>
+          </div>
+          <div class="flex gap-3">
+            <button class="flex-1 rounded-2xl py-3.5 text-base font-bold text-white active:scale-[0.97]" style="background: #DC2626;" @click="executeDelete()">Ya, Kosongkan</button>
+            <button class="flex-1 rounded-2xl py-3.5 text-base font-bold active:scale-[0.97] transition-all" style="background: var(--color-blue-50); color: var(--color-ink-700);" @click="showDeleteDrawer = false">Batal</button>
+          </div>
+        </div>
+      </template>
+    </UDrawer>
   </div>
 </template>

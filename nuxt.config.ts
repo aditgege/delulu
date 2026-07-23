@@ -5,7 +5,6 @@ export default defineNuxtConfig({
   modules: [
     '@nuxt/ui',
     '@nuxt/icon',
-    '@vite-pwa/nuxt',
   ],
 
   app: {
@@ -21,46 +20,6 @@ export default defineNuxtConfig({
   },
 
   css: ['~/assets/css/main.css'],
-
-  pwa: {
-    registerType: 'autoUpdate',
-    manifest: {
-      name: 'Delulul',
-      short_name: 'Delulul',
-      description: 'Reseller purchase optimizer',
-      theme_color: '#171717',
-      background_color: '#fafafa',
-      display: 'standalone',
-      lang: 'id-ID',
-      icons: [
-        { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-        { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
-      ],
-    },
-    workbox: {
-      navigateFallback: '/',
-      globPatterns: ['**/*.{html,js,css,png,svg,ico,woff,woff2,json}'],
-      runtimeCaching: [
-        {
-          urlPattern: /^https?:\/\/.*\/api\/.*/i,
-          handler: 'NetworkFirst',
-          options: {
-            cacheName: 'api-cache',
-            expiration: {
-              maxEntries: 50,
-              maxAgeSeconds: 60 * 60 * 24,
-            },
-          },
-        },
-      ],
-    },
-    client: {
-      installPrompt: true,
-    },
-    devOptions: {
-      enabled: false,
-    },
-  },
 
   vite: {
     optimizeDeps: {

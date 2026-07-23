@@ -1,11 +1,8 @@
+import { supplierMixSchema } from '../../app/utils/validation'
+
 export default defineEventHandler(async (event) => {
   const sql = useDb()
-  const body = await readBody(event)
-  const { id, name, price, contents } = body
-
-  if (!id || !name || !price || !contents?.length) {
-    throw createError({ statusCode: 400, message: 'id, name, price, contents required' })
-  }
+  const { id, name, price, contents } = await validateBody(event, supplierMixSchema)
 
   await sql`INSERT INTO supplier_mixes (id, name, price) VALUES (${id}, ${name}, ${price})`
 

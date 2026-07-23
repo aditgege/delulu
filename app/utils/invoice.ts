@@ -1,4 +1,4 @@
-import type { CustomerOrder, CustomerBakarKukusItem } from '~/types'
+import type { CustomerOrder, Product } from '~/types'
 
 // ─── Merchant Info ───
 
@@ -17,8 +17,6 @@ export const MERCHANT_INFO = {
 } as const
 
 // ─── Helpers ───
-
-const CHILI_OIL_PRICE = 2000
 
 /** Format number as Rupiah string, e.g. 35000 → "Rp35.000" */
 function rp(n: number): string {
@@ -68,9 +66,7 @@ function separator(): string {
 export function formatInvoiceText(
   customer: CustomerOrder,
   poLabel: string,
-  getPackageById: (id: string) => { name: string; price?: number } | undefined,
-  getMenuName: (id: string) => string | undefined,
-  getHargaPorsi?: (menuId: string, caraMasak: string) => number,
+  getProductById: (id: string) => Product | undefined,
 ): string {
   const lines: string[] = []
 
@@ -95,75 +91,28 @@ export function formatInvoiceText(
   let hasItems = false
   let total = 0
   let itemNo = 0
-  let totalChiliOil = 0
-
-  // Frozen packages
   if (customer.items.length > 0) {
     lines.push(headerLine('Produk'))
     for (const item of customer.items) {
-      const pkg = getPackageById(item.packageId)
-      if (!pkg) continue
-      const price = pkg.price ?? 0
+      const product = getProductById(item.productId)
+      if (!product) continue
+      const price = item.unitPrice
       const qty = item.qty
       const lineTotal = price * qty
       total += lineTotal
       itemNo++
       hasItems = true
+      const name = item.variant
+        ? `${product.name} (${item.variant})`
+        : product.name
       lines.push(itemLine(
         `${itemNo}.`,
-        pkg.name,
+        name,
         String(qty),
         rp(price),
         rp(lineTotal),
       ))
-
-      // Extra chili oil per package
-      if (item.extraChiliOil && item.extraChiliOil > 0) {
-        const chiliTotal = item.extraChiliOil * CHILI_OIL_PRICE
-        totalChiliOil += chiliTotal
-      }
     }
-  }
-
-  // Bakar & Kukus items
-  const bkItems = (customer.bakarKukusItems ?? []).filter(
-    (b: CustomerBakarKukusItem) => b.caraMasak === 'bakar' || b.caraMasak === 'kukus',
-  )
-  if (bkItems.length > 0) {
-    if (!hasItems) {
-      // No frozen items shown yet, need header
-      lines.push(headerLine('Produk'))
-    }
-    for (const b of bkItems) {
-      const menuName = getMenuName(b.menuId) ?? b.menuId
-      const caraLabel = b.caraMasak === 'bakar' ? 'Bakar' : 'Kukus'
-      const price = getHargaPorsi?.(b.menuId, b.caraMasak) ?? (b.caraMasak === 'bakar' ? 18000 : 16000)
-      const lineTotal = b.jumlahPorsi * price
-      total += lineTotal
-      hasItems = true
-      lines.push(itemLine(
-        '', // no number for bakar/kukus
-        `${menuName} (${caraLabel})`,
-        `${b.jumlahPorsi} porsi`,
-        rp(price),
-        rp(lineTotal),
-      ))
-    }
-  }
-
-  // Chili oil line (if any)
-  if (totalChiliOil > 0) {
-    total += totalChiliOil
-    const totalChiliItems = (customer.items ?? []).reduce(
-      (s, i) => s + (i.extraChiliOil ?? 0), 0,
-    )
-    lines.push(itemLine(
-      '',
-      '+ Minyak Cabai',
-      String(totalChiliItems),
-      rp(CHILI_OIL_PRICE),
-      rp(totalChiliOil),
-    ))
   }
 
   // ── Totals ──

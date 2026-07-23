@@ -1,46 +1,67 @@
 <script setup lang="ts">
-import { usePurchaseOptimizer } from '~/composables/usePurchaseOptimizer'
-import { useOrderStore } from '~/stores/orders'
+import { computeFullRecommendation } from '~/utils/optimizer'
 import { usePackageStore } from '~/stores/packages'
 import { useInventoryStore } from '~/stores/inventory'
 import { usePoStore } from '~/stores/po'
 import { PORSI_PCS } from '~/types'
+import type { OrderLine, PurchaseRecommendation } from '~/types'
 
 definePageMeta({ title: 'Hasil Optimasi Belanja' })
 
 const route = useRoute()
 const poId = computed(() => route.params.poId as string)
 
-const { result, loading, error } = usePurchaseOptimizer()
-const orderStore = useOrderStore()
 const pkgStore = usePackageStore()
 const invStore = useInventoryStore()
+const poStore = usePoStore()
+
+const loading = ref(true)
+const error = ref<string | null>(null)
+const result = ref<PurchaseRecommendation | null>(null)
+
+// Aggregated items from PO
+const items = ref<OrderLine[]>([])
 
 onMounted(async () => {
   await Promise.all([
-    usePackageStore().ensureLoaded(),
-    useInventoryStore().ensureLoaded(),
-    usePoStore().ensureLoaded(),
+    pkgStore.ensureLoaded(),
+    invStore.ensureLoaded(),
+    poStore.ensureLoaded(),
     fetchHpp(),
   ])
-  const poStore = usePoStore()
   const po = poStore.getOrderById(poId.value)
-  if (!po) return
-  orderStore.clearAll()
-  const agg = new Map<string, number>()
-  const bkAgg = new Map<string, number>()
+  if (!po) {
+    error.value = 'PO tidak ditemukan. Silakan pilih PO lain.'
+    loading.value = false
+    return
+  }
+
+  // Aggregate all customer items into unified item list
+  const agg = new Map<string, OrderLine>()
   for (const c of po.customers) {
-    for (const item of c.items) agg.set(item.packageId, (agg.get(item.packageId) || 0) + item.qty)
-    for (const item of c.bakarKukusItems || []) {
-      const key = `${item.menuId}::${item.caraMasak}`
-      bkAgg.set(key, (bkAgg.get(key) || 0) + item.jumlahPorsi)
+    for (const item of c.items) {
+      const key = item.variant ? `${item.productId}::${item.variant.toLowerCase()}` : item.productId
+      const existing = agg.get(key)
+      if (existing) {
+        existing.qty += item.qty
+      } else {
+        agg.set(key, { productId: item.productId, variant: item.variant?.toLowerCase(), qty: item.qty, unitPrice: item.unitPrice })
+      }
     }
   }
-  for (const pkg of usePackageStore().getAllPackages()) orderStore.setQty(pkg.id, agg.get(pkg.id) || 0)
-  for (const [key, total] of bkAgg) {
-    const [menuId, caraMasak] = key.split('::') as [string, 'bakar' | 'kukus']
-    orderStore.setBakarKukus(menuId, caraMasak, total)
-  }
+  items.value = [...agg.values()]
+
+  // Compute recommendation
+  result.value = computeFullRecommendation(
+    items.value,
+    pkgStore.getAllPackages(),
+    pkgStore.compositions,
+    pkgStore.getAllMenus(),
+    invStore.getAllEntries(),
+    pkgStore.getAllSupplierPacks(),
+    pkgStore.getAllMixes(),
+  )
+  loading.value = false
 })
 
 function fmtRp(n: number) { return 'Rp ' + (n || 0).toLocaleString('id-ID') }
@@ -54,30 +75,54 @@ const emojiMap: Record<string, string> = {
 function e(id: string) { return emojiMap[id] || '📦' }
 function menuName(id: string) { return pkgStore.getMenuById(id)?.name || id }
 
-const totalFrozenPacks = computed(() => orderStore.getOrderLines().reduce((s, l) => s + l.qty, 0))
-const totalPorsi = computed(() => orderStore.getTotalPorsi())
+// ── Computed from aggregated items ──
+const bkVariants = new Set(['bakar', 'kukus'])
+
+function isBK(item: OrderLine): boolean {
+  return !!item.variant && bkVariants.has(item.variant.toLowerCase())
+}
+
+function isBundle(item: OrderLine): boolean {
+  const product = pkgStore.getProductById(item.productId)
+  return product?.type === 'bundle'
+}
+
+const totalFrozenPacks = computed(() =>
+  items.value.filter(i => !isBK(i) && isBundle(i)).reduce((s, l) => s + l.qty, 0)
+)
+
+const totalPorsi = computed(() =>
+  items.value.filter(i => isBK(i)).reduce((s, l) => s + l.qty, 0)
+)
 
 interface MenuDemand { frozen: number; matang: number; total: number }
 const menuDemand = computed(() => {
   const map = new Map<string, MenuDemand>()
-  for (const line of orderStore.getOrderLines()) {
-    const pkg = pkgStore.getPackageById(line.packageId)
-    if (!pkg) continue
-    for (const b of pkg.bom) {
-      const d = map.get(b.menuId) || { frozen: 0, matang: 0, total: 0 }
-      d.frozen += b.qty * line.qty
-      map.set(b.menuId, d)
+  for (const item of items.value) {
+    if (isBK(item)) {
+      const d = map.get(item.productId) || { frozen: 0, matang: 0, total: 0 }
+      d.matang += item.qty * PORSI_PCS
+      map.set(item.productId, d)
+    } else {
+      const comps = pkgStore.getCompositions(item.productId)
+      if (comps.length > 0) {
+        for (const b of comps) {
+          const d = map.get(b.menuId) || { frozen: 0, matang: 0, total: 0 }
+          d.frozen += b.qty * item.qty
+          map.set(b.menuId, d)
+        }
+      } else {
+        const d = map.get(item.productId) || { frozen: 0, matang: 0, total: 0 }
+        d.frozen += item.qty
+        map.set(item.productId, d)
+      }
     }
-  }
-  for (const line of orderStore.getBakarKukusLines()) {
-    const d = map.get(line.menuId) || { frozen: 0, matang: 0, total: 0 }
-    d.matang += line.jumlahPorsi * PORSI_PCS
-    map.set(line.menuId, d)
   }
   return map
 })
 
 const visibleNeeds = computed(() => result.value?.needs.filter(n => n.grossNeed > 0) || [])
+
 const itemsStokHabis = computed(() => result.value?.needs.filter(n => n.stockOnHand === 0 && n.grossNeed > 0) || [])
 const unmetPcs = computed(() => itemsStokHabis.value.reduce((s, n) => s + n.grossNeed, 0))
 
@@ -90,13 +135,23 @@ function hargaPorsi(menuId: string, cm: string): number {
 }
 
 const revenueFrozen = computed(() =>
-  orderStore.getOrderLines().reduce((s, l) => {
-    const pkg = pkgStore.getPackageById(l.packageId)
-    return s + l.qty * (pkg?.price ?? 0)
+  items.value.filter(i => !isBK(i) && isBundle(i)).reduce((s, l) => {
+    const product = pkgStore.getProductById(l.productId)
+    return s + l.qty * (product?.basePrice ?? 0)
   }, 0)
 )
-const revenueBakar = computed(() => orderStore.getSubtotalBakar())
-const revenueKukus = computed(() => orderStore.getSubtotalKukus())
+const revenueBakar = computed(() =>
+  items.value.filter(i => i.variant?.toLowerCase() === 'bakar').reduce((s, l) => {
+    const price = pkgStore.getProductPrice(l.productId, 'bakar')
+    return s + l.qty * price
+  }, 0)
+)
+const revenueKukus = computed(() =>
+  items.value.filter(i => i.variant?.toLowerCase() === 'kukus').reduce((s, l) => {
+    const price = pkgStore.getProductPrice(l.productId, 'kukus')
+    return s + l.qty * price
+  }, 0)
+)
 const revenueMatang = computed(() => revenueBakar.value + revenueKukus.value)
 const totalRevenue = computed(() => revenueFrozen.value + revenueBakar.value + revenueKukus.value)
 const totalHpp = computed(() => result.value?.grandTotalCost ?? 0)
@@ -159,10 +214,42 @@ const mixContents = computed(() => {
   })
 })
 
+const bkLines = computed(() =>
+  items.value.filter(i => isBK(i)).map(i => ({
+    menuId: i.productId,
+    caraMasak: i.variant!.toLowerCase() as 'bakar' | 'kukus',
+    jumlahPorsi: i.qty,
+  }))
+)
+
+// Unified order display list
+interface OrderDisplayItem { id: string; badge: string; label: string; qty: number; price: number }
+const unifiedOrderList = computed(() => {
+  const out: OrderDisplayItem[] = []
+  for (const fb of frozenBreakdown.value) {
+    out.push({ id: fb.id, badge: '❄️', label: fb.name, qty: fb.qty, price: fb.qty * fb.price })
+  }
+  for (const line of bkLines.value) {
+    const price = line.jumlahPorsi * hargaPorsi(line.menuId, line.caraMasak)
+    out.push({
+      id: line.menuId + '-' + line.caraMasak,
+      badge: line.caraMasak === 'bakar' ? '🔥' : '💨',
+      label: menuName(line.menuId) + ' ' + (line.caraMasak === 'bakar' ? 'Bakar' : 'Kukus'),
+      qty: line.jumlahPorsi,
+      price,
+    })
+  }
+  const chili = items.value.find(i => i.productId === 'chili-oil')
+  if (chili && chili.qty > 0) {
+    out.push({ id: 'chili-oil', badge: '🌶️', label: 'Chili Oil', qty: chili.qty, price: chili.qty * (chili.unitPrice || 2000) })
+  }
+  return out
+})
+
 const frozenBreakdown = computed(() =>
-  orderStore.getOrderLines().filter(l => l.qty > 0).map(l => {
-    const pkg = pkgStore.getPackageById(l.packageId)
-    return { id: l.packageId, name: pkg?.name || l.packageId, qty: l.qty, price: pkg?.price ?? 0 }
+  items.value.filter(i => !isBK(i) && isBundle(i)).map(l => {
+    const product = pkgStore.getProductById(l.productId)
+    return { id: l.productId, name: product?.name || l.productId, qty: l.qty, price: product?.basePrice ?? 0 }
   })
 )
 
@@ -177,19 +264,12 @@ const beliList = computed(() => {
   return items
 })
 
-const hppPerPcs = ref(2133)
-async function fetchHpp() {
-  try {
-    const cfg = await $fetch<Record<string, string>>('/api/app-config')
-    if (cfg.hpp_per_pcs) hppPerPcs.value = parseInt(cfg.hpp_per_pcs, 10)
-  } catch { /* ignore */ }
-}
 </script>
 
 <template>
   <div class="slide-up space-y-4">
     <div class="flex items-center gap-2">
-      <button class="text-sm font-semibold active:scale-90" style="color: var(--color-blue-600);" @click="navigateTo('/')">← Kembali</button>
+      <button class="rounded-xl px-3 py-2 text-xs font-bold text-white active:scale-90" style="background: var(--color-blue-500);" @click="navigateTo('/')">← Kembali</button>
       <span class="text-xs font-semibold" style="color: var(--color-ink-500);">/ 🎯 Hasil Optimasi Belanja</span>
     </div>
 
@@ -200,29 +280,16 @@ async function fetchHpp() {
     </div>
 
     <template v-else-if="result">
-      <!-- 📈 Ringkasan Bisnis -->
-      <div class="rounded-2xl border p-4" style="background: linear-gradient(135deg, #059669, #047857); color: white; border: none;">
-        <div class="flex items-center gap-2 mb-3">
-          <span class="text-lg">📈</span>
-          <span class="font-display text-sm font-bold opacity-90">Ringkasan Bisnis</span>
+      <!-- 💰 Modal Belanja -->
+      <div class="rounded-2xl border p-4" style="background: linear-gradient(135deg, #7c3aed, #5b21b6); color: white; border: none;">
+        <div class="flex items-center gap-2 mb-1">
+          <span class="text-lg">💰</span>
+          <span class="font-display text-sm font-bold opacity-90">Total Modal Belanja</span>
         </div>
-        <div class="grid grid-cols-2 gap-2 text-xs">
-          <div class="rounded-lg bg-white/10 p-2">
-            <div class="opacity-70">Revenue</div>
-            <div class="font-bold mt-0.5 text-sm">{{ fmtRp(totalRevenue) }}</div>
-          </div>
-          <div class="rounded-lg bg-white/10 p-2">
-            <div class="opacity-70">Laba</div>
-            <div class="font-bold mt-0.5 text-sm">{{ fmtRp(profit) }}</div>
-          </div>
-          <div class="rounded-lg bg-white/10 p-2">
-            <div class="opacity-70">Modal</div>
-            <div class="font-bold mt-0.5 text-sm">{{ fmtRp(totalHpp) }}</div>
-          </div>
-          <div class="rounded-lg bg-white/10 p-2">
-            <div class="opacity-70">ROI</div>
-            <div class="font-bold mt-0.5 text-sm">{{ fmtPct(roi) }}</div>
-          </div>
+        <div class="font-display text-2xl font-bold mt-1">{{ fmtRp(totalHpp) }}</div>
+        <div class="text-xs font-semibold opacity-75 mt-0.5">
+          {{ mixList.length > 0 ? mixList.map(m => `${m.name} ×${m.qty}`).join(', ') : '' }}
+          {{ individualList.length > 0 ? (mixList.length > 0 ? '+ ' : '') + individualList.length + ' pack satuan' : '' }}
         </div>
       </div>
 
@@ -267,63 +334,49 @@ async function fetchHpp() {
         <div class="flex items-center gap-2 mb-3">
           <span class="text-lg">📦</span>
           <span class="font-display text-sm font-semibold" style="color: var(--color-ink-900);">Kebutuhan Pesanan</span>
+          <span class="ml-auto text-xs font-semibold" style="color: var(--color-ink-500);">{{ totalButuh }} pcs</span>
         </div>
-        <div class="flex items-center gap-3 mb-3 text-xs">
-          <span class="font-bold" style="color: var(--color-blue-600);">{{ totalFrozenPacks }} Frozen</span>
-          <span v-if="totalPorsi > 0" class="font-bold" style="color: var(--color-orange-600);">{{ totalPorsi }} Matang</span>
-          <div class="flex-1"></div>
-          <span class="font-bold" style="color: var(--color-ink-700);">{{ totalButuh }} pcs dibutuhkan</span>
+
+        <!-- Progress bar -->
+        <div class="flex items-center gap-2 text-[10px] font-bold mb-2" style="color: var(--color-ink-500);">
+          <span class="rounded-full px-2 py-0.5" style="background: var(--color-green-100); color: var(--color-green-700);">{{ totalStock }} stok</span>
+          <span class="opacity-40">+</span>
+          <span class="rounded-full px-2 py-0.5" style="background: #FEE2E2; color: #B91C1C;">{{ totalKurang }} beli</span>
         </div>
-        <div class="flex items-center gap-2 text-[10px] font-bold justify-center mb-2" style="color: var(--color-ink-500);">
-          <span class="rounded-full px-2 py-0.5" style="background: var(--color-green-100); color: var(--color-green-700);">{{ totalStock }} tersedia</span>
-          <span>+</span>
-          <span class="rounded-full px-2 py-0.5" style="background: #FEE2E2; color: #B91C1C;">{{ totalKurang }} dibeli</span>
-          <span>→</span>
-          <span class="rounded-full px-2 py-0.5" style="background: var(--color-green-200); color: var(--color-green-800);">{{ totalButuh }} terpenuhi ✓</span>
-        </div>
-        <div class="h-2 rounded-full overflow-hidden mb-1" style="background: var(--color-blue-100);">
+        <div class="h-2 rounded-full overflow-hidden mb-3" style="background: var(--color-blue-100);">
           <div class="h-full rounded-full transition-all" style="background: linear-gradient(90deg, var(--color-green-500), var(--color-blue-500));" :style="{ width: fulfilledPct + '%' }"></div>
         </div>
-        <div class="text-center text-[10px] font-semibold" style="color: var(--color-green-600);">✓ semua pesanan terpenuhi</div>
-      </div>
 
-      <!-- ❄️ Frozen -->
-      <template v-if="frozenBreakdown.length > 0">
-        <div class="rounded-2xl border bg-white px-4 py-2" style="border-color: var(--color-blue-100);">
-          <div class="flex items-center gap-2 py-2">
-            <span class="text-sm">❄️</span>
-            <span class="text-xs font-bold" style="color: var(--color-ink-700);">Frozen</span>
-          </div>
-          <div v-for="fb in frozenBreakdown" :key="fb.id" class="flex items-center justify-between border-t py-2 text-sm" style="border-color: var(--color-blue-50);">
-            <span class="font-semibold">{{ fb.name }}</span>
-            <span class="text-xs font-semibold" style="color: var(--color-ink-500);">{{ fb.qty }} paket &middot; {{ fmtRp(fb.qty * fb.price) }}</span>
-          </div>
-          <div class="flex justify-between border-t py-2 text-sm font-bold" style="color: var(--color-blue-700); border-color: var(--color-blue-50);">
-            <span>Total</span><span>{{ fmtRp(revenueFrozen) }}</span>
-          </div>
-        </div>
-      </template>
-
-      <!-- 🔥 Bakar & Kukus -->
-      <template v-if="orderStore.getBakarKukusLines().filter(l => l.jumlahPorsi > 0).length > 0">
-        <div class="rounded-2xl border px-4 py-3 space-y-1" style="background: var(--color-orange-50); border-color: var(--color-orange-100);">
-          <div class="flex items-center gap-2 pb-1">
-            <span class="text-sm">🔥</span>
-            <span class="text-xs font-bold" style="color: var(--color-ink-700);">Bakar & Kukus &middot; {{ totalPorsi }} porsi</span>
-          </div>
-          <div v-for="line in orderStore.getBakarKukusLines().filter(l => l.jumlahPorsi > 0)" :key="line.menuId + '-' + line.caraMasak" class="flex items-center justify-between text-xs border-t pt-1" style="border-color: var(--color-orange-100);">
-            <span>
-              <span class="font-semibold">{{ menuName(line.menuId) }}</span>
-              <span class="font-bold ml-1" :style="{ color: line.caraMasak === 'bakar' ? 'var(--color-orange-600)' : 'var(--color-blue-600)' }">{{ line.caraMasak === 'bakar' ? 'B' : 'K' }}</span>
+        <!-- Unified item list -->
+        <div class="space-y-1">
+          <div v-for="item in unifiedOrderList" :key="item.id"
+            class="flex items-center justify-between rounded-xl px-3 py-2 text-sm"
+            :style="{ background: item.badge === '🔥' ? 'var(--color-orange-50)' : item.badge === '💨' ? 'var(--color-blue-50)' : item.badge === '🌶️' ? '#FFFBEB' : 'white' }">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="text-sm shrink-0">{{ item.badge }}</span>
+              <span class="font-semibold truncate" style="color: var(--color-ink-900);">{{ item.label }}</span>
             </span>
-            <span class="font-semibold">{{ line.jumlahPorsi }} × Rp{{ (hargaPorsi(line.menuId, line.caraMasak) / 1000).toFixed(0) }}K = Rp{{ (line.jumlahPorsi * hargaPorsi(line.menuId, line.caraMasak)).toLocaleString() }}</span>
-          </div>
-          <div class="flex justify-between pt-1 border-t font-bold text-xs" style="border-color: var(--color-orange-200);">
-            <span>Total</span>
-            <span style="color: var(--color-orange-700);">{{ fmtRp(revenueMatang) }}</span>
+            <span class="font-semibold shrink-0 ml-2 text-xs" style="color: var(--color-ink-500);">{{ item.qty }} × {{ fmtRp(Math.round(item.price / item.qty)) }}</span>
+            <span class="font-display font-bold shrink-0 ml-3 text-sm" style="color: var(--color-blue-700);">{{ fmtRp(item.price) }}</span>
           </div>
         </div>
-      </template>
+
+        <!-- Totals -->
+        <div class="mt-2 pt-2 border-t space-y-1" style="border-color: var(--color-blue-100);">
+          <div class="flex justify-between text-xs">
+            <span class="font-semibold" style="color: var(--color-ink-700);">❄️ Frozen</span>
+            <span class="font-bold" style="color: var(--color-blue-700);">{{ fmtRp(revenueFrozen) }}</span>
+          </div>
+          <div v-if="revenueMatang > 0" class="flex justify-between text-xs">
+            <span class="font-semibold" style="color: var(--color-ink-700);">🔥 Matang</span>
+            <span class="font-bold" style="color: var(--color-orange-600);">{{ fmtRp(revenueMatang) }}</span>
+          </div>
+          <div class="flex justify-between text-sm font-bold pt-1 border-t" style="border-color: var(--color-blue-100);">
+            <span style="color: var(--color-ink-900);">Total Revenue</span>
+            <span style="color: var(--color-ink-900);">{{ fmtRp(totalRevenue) }}</span>
+          </div>
+        </div>
+      </div>
 
       <!-- 🛒 Belanja Supplier -->
       <template v-if="mixContents.length > 0">
@@ -368,33 +421,35 @@ async function fetchHpp() {
       </template>
 
       <!-- 📊 Analisis Per Menu -->
-      <div class="flex items-center gap-2.5">
-        <div class="flex h-8 w-8 items-center justify-center rounded-xl text-sm" style="background: var(--color-blue-100);">📊</div>
-        <span class="font-display text-base font-semibold" style="color: var(--color-ink-900);">Analisis Per Menu</span>
-        <span class="ml-auto rounded-full px-2 py-0.5 text-xs font-bold" style="background: var(--color-blue-100); color: var(--color-blue-700);">{{ visibleNeeds.length }} menu</span>
-      </div>
-      <div class="rounded-2xl border bg-white px-3 py-2 overflow-x-auto" style="border-color: var(--color-blue-100);">
-        <div class="flex items-center border-b py-2 text-[10px] font-bold whitespace-nowrap gap-0.5" style="color: var(--color-ink-500); border-color: var(--color-blue-100);">
-          <span class="w-5 shrink-0"></span>
-          <span class="w-20 shrink-0">Menu</span>
-          <span class="w-10 text-center">❄️</span>
-          <span class="w-10 text-center">🔥</span>
-          <span class="w-10 text-right font-bold" style="color: var(--color-ink-900);">Butuh</span>
-          <span class="w-10 text-right font-bold" style="color: var(--color-green-700);">Stok</span>
-          <span class="w-10 text-right font-bold" style="color: #D44B4B;">Kurang</span>
-          <span class="w-12 text-right font-bold" style="color: var(--color-blue-600);">Setelah</span>
+      <div class="rounded-2xl border bg-white px-4 py-3" style="border-color: var(--color-blue-100);">
+        <div class="flex items-center gap-2 mb-3">
+          <div class="flex h-8 w-8 items-center justify-center rounded-xl text-sm" style="background: var(--color-blue-100);">📊</div>
+          <span class="font-display text-base font-semibold" style="color: var(--color-ink-900);">Cek Kebutuhan Bahan Baku</span>
+          <span class="ml-auto rounded-full px-2 py-0.5 text-xs font-bold" style="background: var(--color-blue-100); color: var(--color-blue-700);">{{ visibleNeeds.length }} menu</span>
         </div>
-        <div v-for="need in visibleNeeds" :key="need.menuId"
-          class="flex items-center border-b py-2.5 text-xs whitespace-nowrap gap-0.5" style="border-color: var(--color-blue-50);"
-          :style="{ background: need.netNeed > 0 ? '#FEF2F2' : 'transparent' }">
-          <span class="w-5 text-sm shrink-0">{{ e(need.menuId) }}</span>
-          <span class="w-20 shrink-0 font-semibold truncate" style="color: var(--color-ink-900);">{{ need.menuName }}</span>
-          <span class="w-10 text-center font-semibold" style="color: var(--color-blue-600);">{{ menuDemand.get(need.menuId)?.frozen || 0 }}</span>
-          <span class="w-10 text-center font-semibold" style="color: var(--color-orange-600);">{{ menuDemand.get(need.menuId)?.matang || 0 }}</span>
-          <span class="w-10 text-right font-bold" style="color: var(--color-ink-900);">{{ need.grossNeed }}</span>
-          <span class="w-10 text-right font-bold" :style="{ color: need.stockOnHand > 0 ? 'var(--color-green-600)' : '#DC2626' }">{{ need.stockOnHand || '0' }}</span>
-          <span class="w-10 text-right font-bold" :style="{ color: need.netNeed > 0 ? '#DC2626' : '#16A34A' }">{{ need.netNeed > 0 ? need.netNeed : '✓' }}</span>
-          <span class="w-12 text-right font-bold" style="color: var(--color-blue-600);">{{ sisaPerMenu.find(s => s.menuId === need.menuId)?.qty ?? '—' }}</span>
+        <div class="space-y-2.5">
+          <div v-for="need in visibleNeeds" :key="need.menuId">
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="flex items-center gap-1.5 min-w-0">
+                <span class="text-sm shrink-0">{{ e(need.menuId) }}</span>
+                <span class="font-semibold truncate" style="color: var(--color-ink-900);">{{ need.menuName }}</span>
+              </span>
+              <span class="font-bold shrink-0 ml-2" :style="{ color: need.netNeed > 0 ? '#DC2626' : 'var(--color-green-600)' }">
+                {{ need.netNeed > 0 ? `kurang ${need.netNeed} pcs` : '✓ cukup' }}
+              </span>
+            </div>
+            <!-- Progress bar: grossNeed vs stock -->
+            <div class="h-3 rounded-full overflow-hidden relative" style="background: var(--color-blue-100);">
+              <!-- Stock portion -->
+              <div class="h-full rounded-full transition-all" style="background: var(--color-green-500);" :style="{ width: Math.min(100, (need.stockOnHand / Math.max(need.grossNeed, 1)) * 100) + '%' }"></div>
+              <!-- Net need indicator (red) — shown as overlay when netNeed > 0 -->
+              <div v-if="need.netNeed > 0" class="absolute inset-y-0 rounded-full transition-all" style="background: rgba(220, 38, 38, 0.7); right: 0;" :style="{ width: Math.min(100, (need.netNeed / Math.max(need.grossNeed, 1)) * 100) + '%' }"></div>
+            </div>
+            <div class="flex justify-between text-[10px] font-semibold mt-0.5" style="color: var(--color-ink-500);">
+              <span>{{ need.grossNeed }} pcs dibutuhkan</span>
+              <span style="color: var(--color-green-600);">{{ need.stockOnHand }} stok</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -406,10 +461,10 @@ async function fetchHpp() {
             <span class="font-display text-xs font-semibold" style="color: var(--color-green-700);">Stok Setelah PO</span>
             <span class="ml-auto text-[10px] font-bold" style="color: var(--color-green-600);">{{ totalSisaAll }} pcs siap dijual</span>
           </div>
-          <div class="text-[10px] font-semibold mb-2" style="color: var(--color-green-500);">{{ sisaNonZero.length }} menu masih memiliki stok</div>
-          <div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            <div v-for="s in sisaNonZero" :key="s.menuId" class="flex items-center justify-between text-xs">
-              <span class="flex items-center gap-1 font-semibold" style="color: var(--color-ink-800);">
+          <div class="text-[10px] font-semibold mb-2" style="color: var(--color-green-500);">{{ sisaNonZero.length }} menu masih punya sisa stok</div>
+          <div class="space-y-1.5">
+            <div v-for="s in sisaNonZero" :key="s.menuId" class="flex items-center justify-between rounded-lg px-3 py-1.5 text-xs" style="background: rgba(255,255,255,0.7);">
+              <span class="flex items-center gap-1.5 font-semibold" style="color: var(--color-ink-800);">
                 <span>{{ e(s.menuId) }}</span> {{ s.name }}
               </span>
               <span class="font-bold" style="color: var(--color-green-700);">{{ s.qty }} pcs</span>
@@ -474,16 +529,25 @@ async function fetchHpp() {
         </div>
       </div>
 
-      <!-- Empty -->
-      <div v-if="!mixList.length && !individualList.length" class="rounded-2xl border p-3.5" style="background: var(--color-green-100); border-color: #B5E0C2;">
-        <div class="flex items-start gap-2.5">
-          <span class="text-xl">🎉</span>
-          <div>
-            <div class="text-sm font-bold" style="color: var(--color-green-700);">Tidak perlu belanja!</div>
-            <div class="mt-0.5 text-xs font-semibold" style="color: var(--color-green-700);">Stok cukup buat semua pesanan hari ini.</div>
+      <!-- 🎉 Tidak perlu belanja / PO kosong -->
+      <template v-if="!mixList.length && !individualList.length">
+        <div class="rounded-2xl border p-3.5" :style="{ background: items.length === 0 ? '#FEF2F2' : 'var(--color-green-100)', borderColor: items.length === 0 ? '#FECACA' : '#B5E0C2' }">
+          <div class="flex items-start gap-2.5">
+            <span class="text-xl">{{ items.length === 0 ? '📋' : '🎉' }}</span>
+            <div>
+              <div v-if="items.length === 0" class="text-sm font-bold" style="color: #B91C1C;">PO belum punya pesanan</div>
+              <div v-else class="text-sm font-bold" style="color: var(--color-green-700);">Tidak perlu belanja!</div>
+              <div class="mt-0.5 text-xs font-semibold" :style="{ color: items.length === 0 ? '#B91C1C' : 'var(--color-green-700)' }">
+                {{ items.length === 0 ? 'Tambah customer & pesanan dulu di halaman PO.' : 'Stok cukup buat semua pesanan hari ini.' }}
+              </div>
+              <button v-if="items.length === 0"
+                class="mt-2 rounded-2xl px-4 py-2 text-xs font-bold text-white active:scale-95"
+                style="background: var(--color-blue-500);"
+                @click="navigateTo(`/po/${poId}`)">+ Tambah Pesanan</button>
+            </div>
           </div>
         </div>
-      </div>
+      </template>
 
       <!-- 🛒 Buat Daftar Belanja -->
       <template v-if="beliList.length > 0">
@@ -492,14 +556,9 @@ async function fetchHpp() {
           @click="showShoppingList = true">🛒 Buat Daftar Belanja</button>
       </template>
 
-      <!-- Shopping List Modal -->
-      <div v-if="showShoppingList" class="fixed inset-0 z-50 flex items-end justify-center" @click.self="showShoppingList = false">
-        <div class="fixed inset-0 bg-black/30 backdrop-blur-sm"></div>
-        <div class="relative w-full max-w-lg rounded-t-3xl bg-white p-5 shadow-2xl" style="animation: slideUp 0.3s ease-out;">
-          <div class="flex items-center justify-between mb-4">
-            <div class="font-display text-base font-bold" style="color: var(--color-ink-900);">🛒 Daftar Belanja Supplier</div>
-            <button class="flex h-8 w-8 items-center justify-center rounded-full text-lg font-bold active:scale-90" style="background: var(--color-cream-100); color: var(--color-ink-500);" @click="showShoppingList = false">×</button>
-          </div>
+      <!-- Shopping List Drawer -->
+      <UDrawer v-model:open="showShoppingList" title="🛒 Daftar Belanja Supplier" direction="bottom" dismissible close>
+        <template #body>
           <div class="space-y-2 mb-4">
             <div v-for="item in beliList" :key="item.label" class="flex items-center justify-between rounded-xl border p-3 text-sm" style="border-color: var(--color-blue-100);">
               <span class="flex items-center gap-2">
@@ -514,17 +573,17 @@ async function fetchHpp() {
             <span class="font-display text-lg font-bold" style="color: var(--color-blue-700);">{{ fmtRp(totalHpp) }}</span>
           </div>
           <button class="w-full rounded-2xl py-3.5 font-display text-sm font-semibold text-white transition-transform active:scale-[0.98]"
-            style="background: linear-gradient(135deg, var(--color-green-500), var(--color-green-700)); box-shadow: 0 8px 24px rgba(5, 150, 105, 0.35);"
+            style="background: linear-gradient(135deg, var(--color-green-500), var(--color-green-700));"
             @click="showShoppingList = false">✓ Siap, Tandai Sudah Dibeli</button>
-        </div>
-      </div>
+        </template>
+      </UDrawer>
 
       <div class="pt-2">
         <button class="w-full rounded-2xl py-4 font-display text-base font-semibold text-white shadow-lg transition-transform active:scale-[0.98]"
           style="background: linear-gradient(135deg, var(--color-blue-400), var(--color-blue-600)); box-shadow: 0 8px 24px rgba(46, 139, 192, 0.35);"
           @click="navigateTo('/')">↩ Edit Pesanan</button>
       </div>
-    </template>
+    </template><!-- end v-else-if="result" -->
 
     <div v-else class="py-16 text-center space-y-4">
       <div class="text-5xl">🌷</div>

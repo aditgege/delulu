@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 @import '@nuxt/ui';
 
-/* StokCeria design tokens */
+/* Delulu design tokens */
 @theme {
   --color-cream-50: #FFFBF0;
   --color-cream-100: #FFF4D9;

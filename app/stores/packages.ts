@@ -1,53 +1,83 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Package, Menu, SupplierPack, SupplierMix } from '~/types'
+import type { Menu, SupplierPack, SupplierMix, Product, ProductVariant, ProductComposition } from '~/types'
 
 export const usePackageStore = defineStore('packages', () => {
-  const packages = ref<Package[]>([])
+  const packages = ref<Product[]>([])
   const menus = ref<Menu[]>([])
   const supplierPacks = ref<SupplierPack[]>([])
   const mixes = ref<SupplierMix[]>([])
+  const variants = ref<ProductVariant[]>([])
+  const compositions = ref<ProductComposition[]>([])
   const loaded = ref(false)
 
   async function ensureLoaded() {
     if (loaded.value) return
     await $fetch('/api/_migrate', { method: 'GET' }).catch(() => {})
 
-    const [pkgData, menuData, packData, mixData] = await Promise.all([
-      $fetch<Package[]>('/api/packages'),
-      $fetch<Menu[]>('/api/menus'),
-      $fetch<SupplierPack[]>('/api/supplier-packs'),
-      $fetch<SupplierMix[]>('/api/mixes'),
+    const raw = await Promise.all([
+      $fetch<any[]>('/api/products'),
+      $fetch<any[]>('/api/menus'),
+      $fetch<any[]>('/api/supplier-packs'),
+      $fetch<any[]>('/api/mixes'),
+      $fetch<any[]>('/api/product-variants'),
+      $fetch<any[]>('/api/product-compositions'),
     ])
 
-    packages.value = pkgData
-    menus.value = menuData
-    supplierPacks.value = packData
-    mixes.value = mixData
+    packages.value = raw[0].map((p: any) => ({ id: p.id, name: p.name, unit: p.unit, type: p.type, basePrice: p.base_price, hpp: p.hpp }))
+    menus.value = raw[1].map((m: any) => ({ id: m.id, name: m.name, unit: m.unit, category: m.category, basePrice: m.base_price }))
+    supplierPacks.value = raw[2].map((p: any) => ({ menuId: p.menu_id, label: p.label, sizePcs: p.size_pcs, price: p.price }))
+    mixes.value = raw[3]
+    variants.value = raw[4].map((v: any) => ({ id: v.id, productId: v.product_id, name: v.name, price: v.price }))
+    compositions.value = raw[5].map((c: any) => ({ productId: c.product_id, menuId: c.menu_id, qty: c.qty }))
     loaded.value = true
-
-    // Pre-load cara masak prices too
-    await ensureCaraMasakLoaded().catch(() => {})
   }
 
-  function getPackageById(id: string): Package | undefined {
+  // ── Product queries ──
+  function getProductById(id: string): Product | undefined {
     return packages.value.find(p => p.id === id)
   }
 
-  function getAllPackages(): Package[] {
+  function getAllPackages(): Product[] {
     return packages.value
   }
 
+  function getVariants(productId: string): ProductVariant[] {
+    return variants.value.filter(v => v.productId === productId)
+  }
+
+  function getProductPrice(productId: string, variant?: string): number {
+    if (variant) {
+      const v = variants.value.find(v => v.productId === productId && v.name.toLowerCase() === variant.toLowerCase())
+      if (v) return v.price
+    }
+    return getProductById(productId)?.basePrice ?? 0
+  }
+
+  function getProductHpp(productId: string, variant?: string): number {
+    if (variant) {
+      const v = variants.value.find(v => v.productId === productId && v.name.toLowerCase() === variant.toLowerCase())
+      if (v && v.hpp) return v.hpp
+    }
+    return getProductById(productId)?.hpp ?? 0
+  }
+
+  function getCompositions(productId: string): ProductComposition[] {
+    return compositions.value.filter(c => c.productId === productId)
+  }
+
+  // ── Menu queries ──
   function getMenuById(id: string): Menu | undefined {
     return menus.value.find(s => s.id === id)
   }
 
-  function getSupplierPack(menuId: string): SupplierPack[] {
-    return supplierPacks.value.filter(p => p.menuId === menuId)
-  }
-
   function getAllMenus(): Menu[] {
     return menus.value
+  }
+
+  // ── Supplier queries ──
+  function getSupplierPack(menuId: string): SupplierPack[] {
+    return supplierPacks.value.filter(p => p.menuId === menuId)
   }
 
   function getAllSupplierPacks(): SupplierPack[] {
@@ -62,61 +92,23 @@ export const usePackageStore = defineStore('packages', () => {
     return mixes.value.find(m => m.id === id)
   }
 
-  async function addPackage(pkg: Package) {
-    await $fetch('/api/packages', { method: 'POST', body: pkg })
-    packages.value.push(pkg)
-  }
-
-  async function updatePackage(id: string, updates: Partial<Package>) {
-    const existing = packages.value.find(p => p.id === id)
-    if (!existing) return
-    const updated = { ...existing, ...updates, id, bom: updates.bom || existing.bom }
-    await $fetch('/api/packages', { method: 'PUT', body: updated })
-    const idx = packages.value.findIndex(p => p.id === id)
-    if (idx >= 0) packages.value[idx] = updated
-  }
-
-  async function removePackage(id: string) {
-    await $fetch('/api/packages', { method: 'DELETE', body: { id } })
-    packages.value = packages.value.filter(p => p.id !== id)
-  }
-
-  async function resetToSeed() {
-    await $fetch('/api/_migrate', { method: 'GET' })
-    await ensureLoaded()
-  }
-
-  // New methods
-  const caraMasaks = ref<import('~/types').CaraMasak[]>([])
-  const menuCaraMasaks = ref<import('~/types').MenuCaraMasak[]>([])
-
-  async function ensureCaraMasakLoaded() {
-    if (caraMasaks.value.length > 0) return
-    const [cmData, mcmData] = await Promise.all([
-      $fetch<import('~/types').CaraMasak[]>('/api/cara-masak'),
-      $fetch<import('~/types').MenuCaraMasak[]>('/api/menu-cara-masak'),
-    ])
-    caraMasaks.value = cmData
-    menuCaraMasaks.value = mcmData
-  }
-
-  function getCaraMasak(): import('~/types').CaraMasak[] {
-    ensureCaraMasakLoaded()
-    return caraMasaks.value
-  }
-
-  function getMenuCaraMasak(menuId: string, caraMasakId?: string): import('~/types').MenuCaraMasak | undefined {
-    ensureCaraMasakLoaded()
-    if (caraMasakId) return menuCaraMasaks.value.find(m => m.menuId === menuId && m.caraMasakId === caraMasakId)
-    return menuCaraMasaks.value.find(m => m.menuId === menuId)
+  function getMenuCaraMasak(menuId: string, caraMasakId?: string): { menuId: string; caraMasakId: string; hargaPorsi: number } | undefined {
+    if (!caraMasakId) return undefined
+    const product = getProductById(menuId)
+    if (!product) return undefined
+    // Look up variant price
+    const v = getVariants(menuId).find(v => v.name.toLowerCase() === caraMasakId.toLowerCase())
+    if (v) return { menuId, caraMasakId, hargaPorsi: v.price }
+    // Fallback
+    return { menuId, caraMasakId, hargaPorsi: product.basePrice }
   }
 
   return {
-    packages, menus, supplierPacks, mixes, loaded,
-    ensureLoaded, ensureCaraMasakLoaded,
-    getPackageById, getAllPackages, getMenuById, getSupplierPack,
-    getAllMenus, getAllSupplierPacks, getAllMixes, getMixById,
-    addPackage, updatePackage, removePackage, resetToSeed,
-    getCaraMasak, getMenuCaraMasak,
+    packages, menus, supplierPacks, mixes, loaded, variants, compositions,
+    ensureLoaded,
+    getProductById, getAllPackages, getVariants, getProductPrice, getCompositions,
+    getMenuById, getAllMenus, getSupplierPack,
+    getAllSupplierPacks, getAllMixes, getMixById,
+    getMenuCaraMasak, getProductHpp,
   }
 })

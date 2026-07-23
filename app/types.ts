@@ -1,16 +1,4 @@
-// ——— Core domain ———
-
-export interface Package {
-  id: string
-  name: string
-  bom: BomLine[]
-  price?: number      // retail selling price per pack (e.g. 35000)
-}
-
-export interface BomLine {
-  menuId: string     // was skuId
-  qty: number
-}
+// ——— Raw Materials (bahan baku, buat stock & supplier) ———
 
 export type MenuCategory = 'dimsum' | 'bento' | 'condiment' | 'other'
 
@@ -19,45 +7,65 @@ export interface Menu {
   name: string
   unit: string
   category?: MenuCategory
+  basePrice?: number
 }
 
-// ——— Cara Masak (cooking methods) ———
+// ——— Selling Products ———
+
+export type ProductType = 'bundle' | 'single' | 'addon'
+
+export interface Product {
+  id: string
+  name: string
+  unit: string
+  type: ProductType
+  basePrice: number
+  hpp?: number
+}
+
+export interface ProductVariant {
+  id: string
+  productId: string
+  name: string
+  price: number
+  hpp?: number
+}
+
+export interface ProductComposition {
+  productId: string
+  menuId: string
+  qty: number
+}
+
+// ——— Cara Masak (keep CaraMasakId for variant identification) ———
 
 export type CaraMasakId = 'bakar' | 'kukus'
 
-export interface CaraMasak {
-  id: CaraMasakId
-  label: string       // display name: Bakar, Kukus, Goreng
-}
-
-export interface MenuCaraMasak {
-  menuId: string
-  caraMasakId: CaraMasakId
-  hargaPorsi: number
-}
-
-// ——— Supplier Mix Paket (bundle of multiple menu items) ———
+// ——— Supplier ———
 
 export interface SupplierMix {
   id: string
   name: string
   price: number
-  contents: BomLine[] // what menus and how many are in one Mix
+  contents: BomLine[]
 }
 
-// ——— Individual supplier packs ———
-
 export interface SupplierPack {
-  menuId: string      // was skuId
+  menuId: string
   label: string
   sizePcs: number
   price: number
 }
 
+export interface BomLine {
+  menuId: string
+  qty: number
+}
+
 // ——— Inventory ———
 
 export interface InventoryEntry {
-  menuId: string      // was skuId
+  menuId: string
   qtyOnHand: number
 }
 
@@ -66,21 +74,35 @@ export interface InventoryEntry {
 /** 1 porsi bakar/kukus = 4 pcs menu yang sama */
 export const PORSI_PCS = 4
 
-/** Satu line item untuk menu bakar/kukus: 1 porsi = 4 pcs menu yang sama */
-export interface BakarKukusLine {
-  menuId: string           // was varianId
-  caraMasak: CaraMasakId
-  jumlahPorsi: number
-}
-
 export interface OrderLine {
-  packageId: string
+  productId: string
+  variant?: string
   qty: number
+  unitPrice: number
 }
 
-// ——— Results ———
+export interface CustomerOrder {
+  id: string
+  name: string
+  items: OrderLine[]
+  bakarKukusItems?: { menuId: string; caraMasak: CaraMasakId; jumlahPorsi: number }[]
+  shippingFee: number
+  discount: number
+  paid: boolean
+  shipped: boolean
+}
 
-export interface MenuNeed {   // was SkuNeed
+export interface PurchaseOrder {
+  id: string
+  label: string
+  customers: CustomerOrder[]
+  createdAt: number
+  closed: boolean
+}
+
+// ——— Optimization Results ———
+
+export interface MenuNeed {
   menuId: string
   menuName: string
   grossNeed: number
@@ -96,7 +118,22 @@ export interface MixOption {
   totalWaste: number
 }
 
-export interface MixMenuRecommendation {   // was MixSkuRecommendation
+export interface PackOption {
+  mediumPacks: number
+  largePacks: number
+  totalUnits: number
+  waste: number
+  totalCost: number
+}
+
+export interface MenuRecommendation {
+  menuId: string
+  menuName: string
+  netNeed: number
+  chosenPack: PackOption
+}
+
+export interface MixMenuRecommendation {
   menuId: string
   menuName: string
   netNeed: number
@@ -116,60 +153,13 @@ export interface MixRecommendation {
   totalWaste: number
 }
 
-// ——— Individual packs for items not covered by Mix ———
-
-export interface PackOption {
-  mediumPacks: number
-  largePacks: number
-  totalUnits: number
-  waste: number
-  totalCost: number
-}
-
-export interface MenuRecommendation {   // was SkuRecommendation
-  menuId: string
-  menuName: string
-  netNeed: number
-  chosenPack: PackOption
-}
-
 export interface PurchaseRecommendation {
   lines: OrderLine[]
-  needs: MenuNeed[]   // was SkuNeed[]
+  needs: MenuNeed[]
   mixRecommendation: MixRecommendation | null
-  individualRecommendations: MenuRecommendation[]   // was SkuRecommendation[]
+  individualRecommendations: MenuRecommendation[]
   grandTotalCost: number
   totalWaste: number
 }
 
-// ——— PO (Pre-Order) Tracking ———
 
-export interface OrderItem {
-  packageId: string
-  qty: number
-  extraChiliOil?: number
-}
-
-export interface CustomerBakarKukusItem {
-  menuId: string              // was varianId
-  caraMasak: CaraMasakId
-  jumlahPorsi: number
-}
-
-export interface CustomerOrder {
-  id: string
-  name: string
-  items: OrderItem[]
-  bakarKukusItems?: CustomerBakarKukusItem[]
-  shippingFee: number
-  paid: boolean
-  shipped: boolean
-}
-
-export interface PurchaseOrder {
-  id: string
-  label: string
-  customers: CustomerOrder[]
-  createdAt: number
-  closed: boolean
-}

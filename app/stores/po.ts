@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { usePackageStore } from '~/stores/packages'
-import type { PurchaseOrder, CustomerOrder, CustomerBakarKukusItem } from '~/types'
+import type { PurchaseOrder, CustomerOrder } from '~/types'
 
 function nextId(): string {
   return `po_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
@@ -25,16 +25,20 @@ export const usePoStore = defineStore('po', () => {
           shippingFee: c.shippingFee ?? 0,
           paid: c.paid,
           shipped: c.shipped,
-          items: c.items.map((i: any) => ({
-            packageId: i.packageId,
+          items: (c.items || []).map((i: any) => ({
+            productId: i.productId,
+            variant: i.variant || undefined,
             qty: i.qty,
-            extraChiliOil: i.extraChiliOil || 0,
+            unitPrice: i.unitPrice || 0,
           })),
-          bakarKukusItems: (c as any).bakarKukusItems?.map((i: any) => ({
-            menuId: i.menuId,
-            caraMasak: i.caraMasak,
-            jumlahPorsi: i.jumlahPorsi,
-          })) || [],
+          // Backward compat: build bakarKukusItems from unified items
+          bakarKukusItems: (c.items || [])
+            .filter((i: any) => i.variant && ['bakar', 'kukus'].includes(i.variant.toLowerCase()))
+            .map((i: any) => ({
+              menuId: i.productId,
+              caraMasak: i.variant.toLowerCase(),
+              jumlahPorsi: i.qty,
+            })),
         })),
         createdAt: detail.order.created_at,
         closed: detail.order.closed,
@@ -68,7 +72,7 @@ export const usePoStore = defineStore('po', () => {
     if (!po) return null
     const customer: CustomerOrder = {
       id: nextId(), name,
-      items: [], bakarKukusItems: [], shippingFee: 0, paid: false, shipped: false,
+      items: [], bakarKukusItems: [], shippingFee: 0, discount: 0, paid: false, shipped: false,
     }
     await $fetch(`/api/orders/${poId}/customers`, {
       method: 'POST',
@@ -89,7 +93,7 @@ export const usePoStore = defineStore('po', () => {
     )
   }
 
-  async function setCustomerItem(poId: string, customerId: string, packageId: string, qty: number, extraChiliOil = 0) {
+  async function setCustomerItem(poId: string, customerId: string, productId: string, qty: number, unitPrice?: number) {
     const validQty = Math.max(0, Math.floor(qty))
     const po = orders.value.find(o => o.id === poId)
     if (!po) return
@@ -97,16 +101,19 @@ export const usePoStore = defineStore('po', () => {
     const customer = po.customers.find(c => c.id === customerId)
     if (!customer) return
 
+    const pkgStore = usePackageStore()
+    const price = unitPrice ?? pkgStore.getProductPrice(productId)
+
     let newItems = [...customer.items]
-    const idx = newItems.findIndex(i => i.packageId === packageId)
+    const idx = newItems.findIndex(i => i.productId === productId)
     if (idx >= 0) {
       if (validQty > 0) {
-        newItems[idx] = { packageId, qty: validQty, extraChiliOil }
+        newItems[idx] = { productId, qty: validQty, unitPrice: price }
       } else {
         newItems.splice(idx, 1)
       }
     } else if (validQty > 0) {
-      newItems.push({ packageId, qty: validQty, extraChiliOil })
+      newItems.push({ productId, qty: validQty, unitPrice: price })
     }
 
     await $fetch(`/api/orders/${poId}/customers/${customerId}/items`, {
@@ -133,6 +140,21 @@ export const usePoStore = defineStore('po', () => {
       o.id === poId
         ? { ...o, customers: o.customers.map(c =>
             c.id === customerId ? { ...c, shippingFee: valid } : c
+          )}
+        : o,
+    )
+  }
+
+  async function setDiscount(poId: string, customerId: string, discount: number) {
+    const valid = Math.max(0, Math.floor(discount))
+    await $fetch(`/api/orders/${poId}/customers/${customerId}/discount`, {
+      method: 'PUT',
+      body: { discount: valid },
+    })
+    orders.value = orders.value.map(o =>
+      o.id === poId
+        ? { ...o, customers: o.customers.map(c =>
+            c.id === customerId ? { ...c, discount: valid } : c
           )}
         : o,
     )
@@ -170,18 +192,11 @@ export const usePoStore = defineStore('po', () => {
     const pkgStore = usePackageStore()
     let total = 0
     for (const item of customer.items) {
-      const pkg = pkgStore.getPackageById(item.packageId)
-      if (pkg?.price) total += pkg.price * item.qty
-      if (item.extraChiliOil) total += 2000 * item.extraChiliOil
-    }
-    for (const item of (customer.bakarKukusItems ?? [])) {
-      if (item.caraMasak === 'bakar' || item.caraMasak === 'kukus') {
-        const mcm = pkgStore.getMenuCaraMasak(item.menuId, item.caraMasak)
-        total += item.jumlahPorsi * (mcm?.hargaPorsi ?? (item.caraMasak === 'bakar' ? 18000 : 16000))
-      }
+      total += item.unitPrice * item.qty
     }
     total += customer.shippingFee ?? 0
-    return total
+    total -= customer.discount ?? 0
+    return Math.max(0, total)
   }
 
   function orderTotal(poId: string): number {
@@ -238,6 +253,7 @@ export const usePoStore = defineStore('po', () => {
     createOrder, closeOrder, deleteOrder,
     addCustomer, removeCustomer,
     setCustomerItem, setShippingFee, togglePaid, toggleShipped,
+    setDiscount,
     customerTotal, orderTotal,
     getClosedOrders, totalRevenue, totalCustomers, totalPackagesSold, totalBakarKukusPorsiSold,
   }

@@ -11,22 +11,18 @@ export default defineEventHandler(async (event) => {
   const customersWithItems = []
   for (const c of customers) {
     const items = await sql`SELECT * FROM order_items WHERE customer_id = ${c.id}`
-    const bkItems = await sql`SELECT * FROM order_bakar_kukus_items WHERE customer_id = ${c.id}`
     customersWithItems.push({
       id: c.id,
       name: c.name,
       shippingFee: c.shipping_fee ?? 0,
+      discount: c.discount ?? 0,
       paid: c.paid,
       shipped: c.shipped,
       items: items.map((i: any) => ({
-        packageId: i.package_id,
+        productId: i.product_id,
+        variant: i.variant,
         qty: i.qty,
-        extraChiliOil: i.extra_chili_oil,
-      })),
-      bakarKukusItems: bkItems.map((i: any) => ({
-        menuId: i.menu_id,
-        caraMasak: i.cara_masak,
-        jumlahPorsi: i.jumlah_porsi,
+        unitPrice: i.unit_price,
       })),
     })
   }

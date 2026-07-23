@@ -1,179 +1,111 @@
 # Delulu Dimsum — Data Reference
 
-> Ringkasan seluruh data bisnis Delulu Dimsum.  
-> Digunakan sebagai acuan seed data, API, dan kalkulator.
+> Ringkasan seluruh data bisnis Delulu Dimsum.
+> Source of truth: `server/api/_migrate.ts` (seed).
 
 ---
 
-## 1. Menu Dimsum
+## 1. Products (Apa yang Dijual)
 
-| ID                      | Nama                    |
-| ----------------------- | ----------------------- |
-| hisitkau                | Hisitkau                |
-| lumpia-kulit-tahu-ayam  | Lumpia Kulit Tahu Ayam  |
-| lumpia-kulit-tahu-udang | Lumpia Kulit Tahu Udang |
-| siomay-ayam             | Siomay Ayam             |
-| siomay-kepiting         | Siomay Kepiting         |
-| siomay-mozzarella       | Siomay Mozzarella       |
-| siomay-nori             | Siomay Nori             |
-| siomay-seafood          | Siomay Seafood          |
-| siomay-udang            | Siomay Udang            |
+### Bundle Frozen
 
-**Total menu:** 9 varian dimsum
+| Product ID   | Harga Jual |
+|-------------|-----------:|
+| paket-halu   | Rp35.000   |
+| paket-when-ya| Rp35.000   |
+| paket-solulu | Rp35.000   |
+
+- **Harga**: Rp35.000/paket (10 pcs)
+- **HPP**: Rp21.333/paket
+
+### Single Matang (per porsi = 4 pcs)
+
+| Menu                    | Bakar    | Kukus    |
+|-------------------------|---------:|---------:|
+| Siomay Ayam             | Rp18.000 | Rp16.000 |
+| Siomay Kepiting         | Rp18.000 | Rp16.000 |
+| Siomay Mozzarella       | Rp18.000 | Rp16.000 |
+| Siomay Nori             | Rp18.000 | Rp16.000 |
+| Siomay Seafood          | Rp18.000 | Rp16.000 |
+| Siomay Udang            | Rp18.000 | Rp16.000 |
+| Hisitkau                | Rp18.000 | Rp16.000 |
+| Lumpia Kulit Tahu Ayam  | Rp18.000 | Rp16.000 |
+| Lumpia Kulit Tahu Udang | Rp18.000 | Rp16.000 |
+
+### Addon
+
+| Product   | Harga    |
+|-----------|---------:|
+| Chili Oil | Rp2.000  |
 
 ---
 
-## 2. Stok Awal
+## 2. Supplier Mix
 
-| Menu                    | Qty (pcs) |
-| ----------------------- | --------: |
-| Hisitkau                |         8 |
-| Lumpia Kulit Tahu Ayam  |        20 |
-| Lumpia Kulit Tahu Udang |         0 |
-| Siomay Ayam             |         6 |
-| Siomay Kepiting         |        10 |
-| Siomay Mozzarella       |         6 |
-| Siomay Nori             |        18 |
-| Siomay Seafood          |         6 |
-| Siomay Udang            |         8 |
-
-**Total stok:** **82 pcs**
-
----
-
-## 3. Supplier Mix
-
-Semua mix harga **Rp64.000**.
-
-| Mix   | Nama    |    Harga |    Isi |
-| ----- | ------- | -------: | -----: |
-| Mix A | Halu    | Rp64.000 | 30 pcs |
-| Mix B | When Ya | Rp64.000 | 30 pcs |
-| Mix E | Solulu  | Rp64.000 | 30 pcs |
+| Mix   | Harga    | Isi     |
+|-------|---------:|:--------|
+| Mix A | Rp64.000 | 30 pcs  |
+| Mix B | Rp64.000 | 30 pcs  |
+| Mix E | Rp64.000 | 30 pcs  |
 
 ### Mix A (Halu)
-
-| Menu                    | Qty |
-| ----------------------- | --: |
-| Siomay Ayam             |   6 |
-| Lumpia Kulit Tahu Udang |   6 |
-| Siomay Nori             |   6 |
-| Siomay Kepiting         |   6 |
-| Hisitkau                |   6 |
+Siomay Ayam(6), Lumpia Kulit Tahu Udang(6), Siomay Nori(6), Siomay Kepiting(6), Hisitkau(6)
 
 ### Mix B (When Ya)
-
-| Menu                   | Qty |
-| ---------------------- | --: |
-| Siomay Udang           |   6 |
-| Lumpia Kulit Tahu Ayam |   6 |
-| Siomay Nori            |   6 |
-| Siomay Seafood         |   6 |
-| Hisitkau               |   6 |
+Siomay Udang(6), Lumpia Kulit Tahu Ayam(6), Siomay Nori(6), Siomay Seafood(6), Hisitkau(6)
 
 ### Mix E (Solulu)
-
-| Menu                   | Qty |
-| ---------------------- | --: |
-| Siomay Ayam            |   6 |
-| Lumpia Kulit Tahu Ayam |   6 |
-| Siomay Nori            |   6 |
-| Siomay Kepiting        |   6 |
-| Siomay Mozzarella      |   6 |
+Siomay Ayam(6), Lumpia Kulit Tahu Ayam(6), Siomay Nori(6), Siomay Kepiting(6), Siomay Mozzarella(6)
 
 ---
 
-## 4. Paket Frozen
+## 3. Supplier Pack (per Menu)
 
-Harga jual: **Rp35.000** per paket (10 pcs).
-
-### Paket Halu
-
-| Menu                    | Qty |
-| ----------------------- | --: |
-| Siomay Ayam             |   2 |
-| Lumpia Kulit Tahu Udang |   2 |
-| Siomay Nori             |   2 |
-| Siomay Kepiting         |   2 |
-| Hisitkau                |   2 |
-
-### Paket When Ya
-
-| Menu                   | Qty |
-| ---------------------- | --: |
-| Siomay Udang           |   2 |
-| Lumpia Kulit Tahu Ayam |   2 |
-| Siomay Nori            |   2 |
-| Siomay Seafood         |   2 |
-| Hisitkau               |   2 |
-
-### Paket Solulu
-
-| Menu                   | Qty |
-| ---------------------- | --: |
-| Siomay Ayam            |   2 |
-| Lumpia Kulit Tahu Ayam |   2 |
-| Siomay Nori            |   2 |
-| Siomay Kepiting        |   2 |
-| Siomay Mozzarella      |   2 |
+| Menu                    | Medium (30 pcs) | Large (24 pcs) |
+|-------------------------|----------------:|----------------:|
+| Siomay Ayam             |         Rp63.000|        Rp63.000 |
+| Siomay Kepiting         |         Rp63.000|        Rp63.000 |
+| Siomay Seafood          |         Rp63.000|        Rp63.000 |
+| Siomay Udang            |         Rp64.000|        Rp64.000 |
+| Siomay Nori             |         Rp64.000|        Rp64.000 |
+| Siomay Mozzarella       |         Rp69.000|        Rp69.000 |
+| Hisitkau                |         Rp64.000|        Rp64.000 |
+| Lumpia Kulit Tahu Ayam  |         Rp65.000|        Rp65.000 |
+| Lumpia Kulit Tahu Udang |         Rp66.000|        Rp66.000 |
 
 ---
 
-## 5. Menu Siap Saji
+## 4. Raw Materials (Menus)
 
-| Jenis |    Harga | Isi                    |
-| ----- | -------: | ---------------------- |
-| Kukus | Rp16.000 | 4 pcs (1 varian) |
-| Bakar | Rp18.000 | 4 pcs (1 varian) |
-
----
-
-## 6. Ringkasan Harga
-
-| Produk       |    Harga |
-| ------------ | -------: |
-| Supplier Mix | Rp64.000 |
-| Paket Frozen | Rp35.000 |
-| Kukus        | Rp16.000 |
-| Bakar        | Rp18.000 |
+9 menu dimsum + chili oil (condiment). Digunakan sebagai:
+- Bahan baku untuk inventory
+- Referensi komposisi produk (BOM)
+- Tracking stok
 
 ---
 
-## 7. HPP
-
-| Item                      |    Nilai |
-| ------------------------- | -------: |
-| Harga Supplier            | Rp64.000 |
-| Isi Supplier              |   30 pcs |
-| HPP per pcs               |  Rp2.133 |
-| HPP Paket Frozen (10 pcs) | Rp21.333 |
-
----
-
-## 8. Business Rules
+## 5. Business Rules
 
 | Produk         | Pemakaian Stok         |
-| -------------- | ---------------------- |
-| 1 Paket Frozen | 2 pcs per varian       |
+| -------------- | -----------------------|
+| 1 Paket Frozen | 2 pcs per varian di BOM|
 | 1 Porsi Kukus  | 4 pcs (satu varian)    |
 | 1 Porsi Bakar  | 4 pcs (satu varian)    |
 
 ### Rumus Stok
-
 - **Frozen:** `floor(qty_on_hand / 2)` → jumlah paket bisa dibuat
 - **Kukus/Bakar:** `floor(qty_on_hand / 4)` → jumlah porsi bisa dibuat
 
-### Alur Pengurangan Stok
-
-**Order Frozen** — setiap paket kurangi 2 pcs per varian di BOM.  
-**Order Kukus/Bakar** — kurangi `jumlahPorsi × 4` pcs dari menu terkait.
-
 ---
 
-## 9. Lokasi Seed Data
+## 6. HPP Constants
 
-| File | Keterangan |
-|------|-----------|
-| `server/db/seed.sql` | ~~SQL seed~~ (deleted, pakai TS seed) |
-| `server/api/_migrate.ts` | Runtime migration + seed (dijalankan otomatis) |
-| `app/data/seed.ts` | TypeScript seed data (referensi) |
+```ts
+BAKAR_PRICE = 18000   // per porsi
+KUKUS_PRICE = 16000   // per porsi
+FROZEN_PRICE = 35000  // per paket
+CHILI_OIL_PRICE = 2000
+MIX_PRICE = 64000     // per mix supplier
+```
+
+HPP per pcs dihitung dari `supplier_packs.price / supplier_packs.size_pcs`.
