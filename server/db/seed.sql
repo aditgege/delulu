@@ -1,6 +1,7 @@
 -- Seed data for Delulul — Kukus/Frozen only (9 dimsum variants)
 
 INSERT INTO menus (id, name, unit, category) VALUES
+  -- Dimsum jual
   ('hisitkau', 'Hisitkau', 'pcs', 'dimsum'),
   ('lumpia-kulit-tahu-ayam', 'Lumpia Kulit Tahu Ayam', 'pcs', 'dimsum'),
   ('lumpia-kulit-tahu-udang', 'Lumpia Kulit Tahu Udang', 'pcs', 'dimsum'),
@@ -9,12 +10,37 @@ INSERT INTO menus (id, name, unit, category) VALUES
   ('siomay-mozzarella', 'Siomay Mozzarella', 'pcs', 'dimsum'),
   ('siomay-nori', 'Siomay Nori', 'pcs', 'dimsum'),
   ('siomay-seafood', 'Siomay Seafood', 'pcs', 'dimsum'),
-  ('siomay-udang', 'Siomay Udang', 'pcs', 'dimsum')
+  ('siomay-udang', 'Siomay Udang', 'pcs', 'dimsum'),
+  -- Supplier kukus tambahan
+  ('siomay-mercon', 'Siomay Mercon', 'pcs', 'kukus'),
+  ('gyoza-ayam', 'Gyoza Ayam', 'pcs', 'kukus'),
+  ('gyoza-ayam-udang', 'Gyoza Ayam Udang', 'pcs', 'kukus'),
+  ('bakpao-ayam', 'Bakpao Ayam', 'pcs', 'kukus'),
+  ('bakpao-susu', 'Bakpao Susu', 'pcs', 'kukus'),
+  ('bakpao-cokelat', 'Bakpao Cokelat', 'pcs', 'kukus'),
+  ('angsio', 'Angsio', 'pcs', 'kukus'),
+  ('hakau', 'Hakau', 'pcs', 'kukus'),
+  -- Supplier goreng
+  ('ayam-bola-keju', 'Ayam Bola Keju', 'pcs', 'goreng'),
+  ('pangsit-ayam', 'Pangsit Ayam', 'pcs', 'goreng'),
+  ('pangsit-udang', 'Pangsit Udang', 'pcs', 'goreng'),
+  ('ekado', 'Ekado', 'pcs', 'goreng'),
+  ('kumis-naga', 'Kumis Naga', 'pcs', 'goreng'),
+  ('kuotie', 'Kuotie', 'pcs', 'goreng'),
+  ('wonton', 'Wonton', 'pcs', 'goreng'),
+  ('cakue-goreng-udang', 'Cakue Goreng Udang', 'pcs', 'goreng'),
+  ('lumpia-goreng-ayam', 'Lumpia Goreng Ayam', 'pcs', 'goreng'),
+  ('lumpia-goreng-udang', 'Lumpia Goreng Udang', 'pcs', 'goreng'),
+  ('lumpia-goreng-keju', 'Lumpia Goreng Keju Lumer', 'pcs', 'goreng'),
+  ('gohyong', 'Gohyong', 'pcs', 'goreng'),
+  -- Supplier rebus
+  ('pangsit-ayam-rebus', 'Pangsit Ayam Rebus', 'pcs', 'rebus')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO supplier_mixes (id, name, price) VALUES
   ('mix-a', 'Mix A', 64000),
   ('mix-b', 'Mix B', 64000),
+  ('mix-c', 'Mix C', 64000),
   ('mix-e', 'Mix E', 64000)
 ON CONFLICT (id) DO NOTHING;
 
@@ -33,7 +59,12 @@ INSERT INTO mix_contents (mix_id, menu_id, qty) VALUES
   ('mix-e', 'lumpia-kulit-tahu-ayam', 6),
   ('mix-e', 'siomay-nori', 6),
   ('mix-e', 'siomay-kepiting', 6),
-  ('mix-e', 'siomay-mozzarella', 6)
+  ('mix-e', 'siomay-mozzarella', 6),
+  ('mix-c', 'kuotie', 6),
+  ('mix-c', 'lumpia-goreng-ayam', 6),
+  ('mix-c', 'wonton', 6),
+  ('mix-c', 'ekado', 6),
+  ('mix-c', 'kumis-naga', 6)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO packages (id, name, price) VALUES
@@ -78,7 +109,32 @@ INSERT INTO supplier_packs (menu_id, label, size_pcs, price) VALUES
   ('lumpia-kulit-tahu-ayam', 'Medium', 30, 65000),
   ('lumpia-kulit-tahu-ayam', 'Large', 24, 65000),
   ('lumpia-kulit-tahu-udang', 'Medium', 30, 66000),
-  ('lumpia-kulit-tahu-udang', 'Large', 24, 66000)
+  ('lumpia-kulit-tahu-udang', 'Large', 24, 66000),
+  -- Kukus tambahan
+  ('siomay-mercon', 'Medium', 30, 69000),
+  ('siomay-mercon', 'Large', 24, 69000),
+  ('gyoza-ayam', 'Medium', 30, 58000),
+  ('gyoza-ayam-udang', 'Medium', 30, 63000),
+  ('bakpao-ayam', 'Large', 24, 62000),
+  ('bakpao-susu', 'Large', 24, 62000),
+  ('bakpao-cokelat', 'Large', 24, 62000),
+  ('angsio', 'Large', 24, 68000),
+  ('hakau', 'Large', 24, 69000),
+  -- Goreng
+  ('ayam-bola-keju', 'Regular', 15, 27000),
+  ('pangsit-ayam', 'Medium', 30, 53000),
+  ('pangsit-udang', 'Medium', 30, 58000),
+  ('ekado', 'Large', 24, 63000),
+  ('kumis-naga', 'Medium', 30, 63000),
+  ('kuotie', 'Large', 24, 63000),
+  ('wonton', 'Medium', 30, 64000),
+  ('cakue-goreng-udang', 'Large', 24, 64000),
+  ('lumpia-goreng-ayam', 'Medium', 30, 63000),
+  ('lumpia-goreng-udang', 'Medium', 30, 64000),
+  ('lumpia-goreng-keju', 'Large', 24, 67000),
+  ('gohyong', 'Medium', 30, 69000),
+  -- Rebus
+  ('pangsit-ayam-rebus', 'Medium', 30, 64000)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO app_config (key, value) VALUES ('hpp_per_pcs', '2133') ON CONFLICT (key) DO NOTHING;
