@@ -174,6 +174,6 @@ Harga jual: **Rp35.000** per paket (10 pcs).
 
 | File | Keterangan |
 |------|-----------|
-| `server/db/seed.sql` | SQL seed langsung ke PostgreSQL |
+| `server/db/seed.sql` | ~~SQL seed~~ (deleted, pakai TS seed) |
 | `server/api/_migrate.ts` | Runtime migration + seed (dijalankan otomatis) |
 | `app/data/seed.ts` | TypeScript seed data (referensi) |

@@ -22,7 +22,7 @@ server/
 │   ├── _migrate.ts      # runs DDL on first client load
 │   ├── mixes.get.ts     # supplier mixes
 │   └── supplier-packs.get.ts
-├── db/                  # schema.sql (13 tables), seed.sql (stale)
+├── db/                  # schema.sql (13 tables)
 ├── middleware/auth.ts   # Cookie guard — blocks /api/* if no delulul_auth
 └── utils/db.ts          # Neon singleton — useDb() returns sql tagged template
 ```
@@ -57,4 +57,4 @@ server/
 - **Inconsistent param style** — `packages.delete.ts` reads id from `readBody`, not `getRouterParam(event, 'id')`. Other deletes use route params.
 - **`any` type poison** — SQL rows return untyped; client stores use `$fetch<any>`. 14+ sites across server handlers.
 - **No input validation** — zero Zod/Joi schemas. Request bodies consumed raw via `readBody()`.
-- **Seed drift** — `db/seed.sql` is stale; real seed lives in `app/data/seed.ts`.
+- **Seed lives in** `app/data/seed.ts` (SQL seed deleted).

@@ -6,6 +6,12 @@ export default defineEventHandler(async (event) => {
   // Check if already seeded
   const result = await sql`SELECT COUNT(*)::int as count FROM menus`
   const count = result?.[0]?.count ?? 0
+
+  // Always cleanup non-core menus (supplier tambahan/goreng/rebus)
+  const coreMenuIds = ['hisitkau','lumpia-kulit-tahu-ayam','lumpia-kulit-tahu-udang','siomay-ayam','siomay-kepiting','siomay-mozzarella','siomay-nori','siomay-seafood','siomay-udang']
+  const ph = coreMenuIds.map((_, i) => `$${i + 1}`).join(',')
+  await sql.query(`DELETE FROM menus WHERE id NOT IN (${ph})`, coreMenuIds).catch(() => {})
+
   if (count > 0 && !force) {
     return { status: 'ok', message: `Already seeded (${count} menus)` }
   }
@@ -43,9 +49,8 @@ export default defineEventHandler(async (event) => {
   await sql.query('CREATE TABLE IF NOT EXISTS order_customers (id TEXT PRIMARY KEY, po_id TEXT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE, name TEXT NOT NULL, paid BOOLEAN NOT NULL DEFAULT false, shipped BOOLEAN NOT NULL DEFAULT false)', [])
   await sql.query('CREATE TABLE IF NOT EXISTS order_items (id SERIAL PRIMARY KEY, customer_id TEXT NOT NULL REFERENCES order_customers(id) ON DELETE CASCADE, package_id TEXT NOT NULL, qty INTEGER NOT NULL DEFAULT 0, extra_chili_oil INTEGER NOT NULL DEFAULT 0)', [])
 
-  // ── Seed: menus ──
+  // ── Seed: menus (9 core) ──
   const skus: Array<[string, string, string]> = [
-    // Dimsum jual
     ['hisitkau', 'Hisitkau', 'dimsum'],
     ['lumpia-kulit-tahu-ayam', 'Lumpia Kulit Tahu Ayam', 'dimsum'],
     ['lumpia-kulit-tahu-udang', 'Lumpia Kulit Tahu Udang', 'dimsum'],
@@ -55,30 +60,6 @@ export default defineEventHandler(async (event) => {
     ['siomay-nori', 'Siomay Nori', 'dimsum'],
     ['siomay-seafood', 'Siomay Seafood', 'dimsum'],
     ['siomay-udang', 'Siomay Udang', 'dimsum'],
-    // Supplier kukus tambahan
-    ['siomay-mercon', 'Siomay Mercon', 'kukus'],
-    ['gyoza-ayam', 'Gyoza Ayam', 'kukus'],
-    ['gyoza-ayam-udang', 'Gyoza Ayam Udang', 'kukus'],
-    ['bakpao-ayam', 'Bakpao Ayam', 'kukus'],
-    ['bakpao-susu', 'Bakpao Susu', 'kukus'],
-    ['bakpao-cokelat', 'Bakpao Cokelat', 'kukus'],
-    ['angsio', 'Angsio', 'kukus'],
-    ['hakau', 'Hakau', 'kukus'],
-    // Supplier goreng
-    ['ayam-bola-keju', 'Ayam Bola Keju', 'goreng'],
-    ['pangsit-ayam', 'Pangsit Ayam', 'goreng'],
-    ['pangsit-udang', 'Pangsit Udang', 'goreng'],
-    ['ekado', 'Ekado', 'goreng'],
-    ['kumis-naga', 'Kumis Naga', 'goreng'],
-    ['kuotie', 'Kuotie', 'goreng'],
-    ['wonton', 'Wonton', 'goreng'],
-    ['cakue-goreng-udang', 'Cakue Goreng Udang', 'goreng'],
-    ['lumpia-goreng-ayam', 'Lumpia Goreng Ayam', 'goreng'],
-    ['lumpia-goreng-udang', 'Lumpia Goreng Udang', 'goreng'],
-    ['lumpia-goreng-keju', 'Lumpia Goreng Keju Lumer', 'goreng'],
-    ['gohyong', 'Gohyong', 'goreng'],
-    // Supplier rebus
-    ['pangsit-ayam-rebus', 'Pangsit Ayam Rebus', 'rebus'],
   ]
   for (const [id, name, cat] of skus) {
     await sql`INSERT INTO menus (id, name, unit, category) VALUES (${id}, ${name}, 'pcs', ${cat}) ON CONFLICT (id) DO NOTHING`
@@ -91,13 +72,12 @@ export default defineEventHandler(async (event) => {
   await sql`INSERT INTO package_bom (package_id,menu_id,qty) VALUES ('paket-when-ya','siomay-udang',2),('paket-when-ya','lumpia-kulit-tahu-ayam',2),('paket-when-ya','siomay-nori',2),('paket-when-ya','siomay-seafood',2),('paket-when-ya','hisitkau',2) ON CONFLICT DO NOTHING`
   await sql`INSERT INTO package_bom (package_id,menu_id,qty) VALUES ('paket-solulu','siomay-ayam',2),('paket-solulu','lumpia-kulit-tahu-ayam',2),('paket-solulu','siomay-nori',2),('paket-solulu','siomay-kepiting',2),('paket-solulu','siomay-mozzarella',2) ON CONFLICT DO NOTHING`
 
-  await sql`INSERT INTO supplier_mixes (id,name,price) VALUES ('mix-a','Mix A',64000),('mix-b','Mix B',64000),('mix-c','Mix C',64000),('mix-e','Mix E',64000) ON CONFLICT (id) DO NOTHING`
+  await sql`INSERT INTO supplier_mixes (id,name,price) VALUES ('mix-a','Mix A',64000),('mix-b','Mix B',64000),('mix-e','Mix E',64000) ON CONFLICT (id) DO NOTHING`
 
   const mixData: Array<[string, string]> = [
     ['mix-a','siomay-ayam'],['mix-a','lumpia-kulit-tahu-udang'],['mix-a','siomay-nori'],['mix-a','siomay-kepiting'],['mix-a','hisitkau'],
     ['mix-b','siomay-udang'],['mix-b','lumpia-kulit-tahu-ayam'],['mix-b','siomay-nori'],['mix-b','siomay-seafood'],['mix-b','hisitkau'],
     ['mix-e','siomay-ayam'],['mix-e','lumpia-kulit-tahu-ayam'],['mix-e','siomay-nori'],['mix-e','siomay-kepiting'],['mix-e','siomay-mozzarella'],
-    ['mix-c','kuotie'],['mix-c','lumpia-goreng-ayam'],['mix-c','wonton'],['mix-c','ekado'],['mix-c','kumis-naga'],
   ]
   for (const [mixId, menuId] of mixData) {
     await sql`INSERT INTO mix_contents (mix_id,menu_id,qty) VALUES (${mixId},${menuId},6) ON CONFLICT DO NOTHING`
@@ -113,21 +93,6 @@ export default defineEventHandler(async (event) => {
     ['hisitkau','Medium',30,64000],['hisitkau','Large',24,64000],
     ['lumpia-kulit-tahu-ayam','Medium',30,65000],['lumpia-kulit-tahu-ayam','Large',24,65000],
     ['lumpia-kulit-tahu-udang','Medium',30,66000],['lumpia-kulit-tahu-udang','Large',24,66000],
-    // Kukus tambahan
-    ['siomay-mercon','Medium',30,69000],['siomay-mercon','Large',24,69000],
-    ['gyoza-ayam','Medium',30,58000],['gyoza-ayam-udang','Medium',30,63000],
-    ['bakpao-ayam','Large',24,62000],['bakpao-susu','Large',24,62000],['bakpao-cokelat','Large',24,62000],
-    ['angsio','Large',24,68000],['hakau','Large',24,69000],
-    // Goreng
-    ['ayam-bola-keju','Regular',15,27000],
-    ['pangsit-ayam','Medium',30,53000],['pangsit-udang','Medium',30,58000],
-    ['ekado','Large',24,63000],['kumis-naga','Medium',30,63000],
-    ['kuotie','Large',24,63000],['wonton','Medium',30,64000],
-    ['cakue-goreng-udang','Large',24,64000],
-    ['lumpia-goreng-ayam','Medium',30,63000],['lumpia-goreng-udang','Medium',30,64000],
-    ['lumpia-goreng-keju','Large',24,67000],['gohyong','Medium',30,69000],
-    // Rebus
-    ['pangsit-ayam-rebus','Medium',30,64000],
   ]
   for (const [menuId, label, sizePcs, price] of packs) {
     await sql`INSERT INTO supplier_packs (menu_id,label,size_pcs,price) VALUES (${menuId},${label},${sizePcs},${price}) ON CONFLICT DO NOTHING`

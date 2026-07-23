@@ -23,7 +23,7 @@ export interface Menu {
 
 // ——— Cara Masak (cooking methods) ———
 
-export type CaraMasakId = 'bakar' | 'kukus' | 'goreng'
+export type CaraMasakId = 'bakar' | 'kukus'
 
 export interface CaraMasak {
   id: CaraMasakId

@@ -77,6 +77,25 @@ const supplierPacks = ref<SupplierPackItem[]>([])
 const editMixPrice = ref<Record<string, number>>({})
 const editPackPrice = ref<Record<string, number>>({})
 
+// ── Add Mix ──
+const newMix = ref({ id: '', name: '', price: 0, contents: [] as Array<{ menuId: string; qty: number }> })
+function addMixRow() { newMix.value.contents.push({ menuId: menus.value[0]?.id || '', qty: 6 }) }
+async function saveNewMix() {
+  const m = newMix.value; if (!m.id || !m.name || !m.price || !m.contents.length) return
+  await $fetch('/api/mixes', { method: 'POST', body: m })
+  newMix.value = { id: '', name: '', price: 0, contents: [] }
+  await fetchSupplier()
+}
+
+// ── Add Pack ──
+const newPack = ref({ menuId: '', label: 'Medium', sizePcs: 30, price: 0 })
+async function saveNewPack() {
+  const p = newPack.value; if (!p.menuId || !p.label || !p.sizePcs || !p.price) return
+  await $fetch('/api/supplier-packs', { method: 'POST', body: p })
+  newPack.value = { menuId: '', label: 'Medium', sizePcs: 30, price: 0 }
+  await fetchSupplier()
+}
+
 async function fetchSupplier() {
   [supplierMixes.value, supplierPacks.value] = await Promise.all([
     $fetch<SupplierMixItem[]>('/api/mixes'),
@@ -354,6 +373,31 @@ onMounted(async () => {
       <!-- Mix Pricing -->
       <div class="rounded-2xl border bg-white px-4 py-3" style="border-color: var(--color-blue-100);">
         <div class="font-display text-sm font-semibold mb-3" style="color: var(--color-ink-900);">🛍️ Harga Mix Supplier</div>
+
+        <!-- Add Mix form -->
+        <div class="rounded-xl p-3 mb-3 space-y-2" style="background: var(--color-cream-50); border: 1px solid var(--color-cream-200);">
+          <div class="text-xs font-bold" style="color: var(--color-ink-600);">Tambah Mix Baru</div>
+          <div class="grid grid-cols-3 gap-2">
+            <input v-model="newMix.id" placeholder="ID (mix-f)" class="rounded-xl border px-3 py-2 text-xs font-semibold outline-none" style="border-color: var(--color-blue-200);" />
+            <input v-model="newMix.name" placeholder="Nama (Mix F)" class="rounded-xl border px-3 py-2 text-xs font-semibold outline-none" style="border-color: var(--color-blue-200);" />
+            <div class="flex items-center gap-1">
+              <span class="text-[10px] font-semibold" style="color: var(--color-ink-500);">Rp</span>
+              <input type="number" v-model.number="newMix.price" placeholder="64000" class="w-full rounded-xl border px-3 py-2 text-xs font-semibold outline-none" style="border-color: var(--color-blue-200);" />
+            </div>
+          </div>
+          <div v-for="(row, ri) in newMix.contents" :key="ri" class="flex gap-2 items-center">
+            <select v-model="row.menuId" class="flex-1 rounded-lg border px-2 py-1.5 text-xs font-semibold outline-none" style="border-color: var(--color-blue-200);">
+              <option v-for="menu in menus" :key="menu.id" :value="menu.id">{{ menu.name }}</option>
+            </select>
+            <input type="number" v-model.number="row.qty" placeholder="6" class="w-14 rounded-lg border px-2 py-1.5 text-xs font-semibold outline-none text-center" style="border-color: var(--color-blue-200);" />
+            <button class="text-xs font-bold" style="color: var(--color-red-400);" @click="newMix.contents.splice(ri, 1)">✕</button>
+          </div>
+          <div class="flex gap-2">
+            <button class="text-xs font-bold" style="color: var(--color-blue-600);" @click="addMixRow()">+ Tambah item</button>
+            <button class="ml-auto rounded-lg px-3 py-1.5 text-xs font-bold text-white active:scale-90" style="background: var(--color-green-500);" @click="saveNewMix()">Simpan Mix</button>
+          </div>
+        </div>
+
         <div class="space-y-2">
           <div v-for="mix in supplierMixes" :key="mix.id"
             class="flex items-center gap-3 rounded-xl border p-3" style="border-color: var(--color-blue-50);">
@@ -379,6 +423,25 @@ onMounted(async () => {
       <!-- Pack Pricing -->
       <div class="rounded-2xl border bg-white px-4 py-3" style="border-color: var(--color-blue-100);">
         <div class="font-display text-sm font-semibold mb-3" style="color: var(--color-ink-900);">📦 Harga Pack per Varian</div>
+
+        <!-- Add Pack form -->
+        <div class="rounded-xl p-3 mb-3 space-y-2" style="background: var(--color-cream-50); border: 1px solid var(--color-cream-200);">
+          <div class="text-xs font-bold" style="color: var(--color-ink-600);">Tambah Pack Baru</div>
+          <div class="flex flex-wrap gap-2 items-center">
+            <select v-model="newPack.menuId" class="rounded-lg border px-2 py-1.5 text-xs font-semibold outline-none" style="border-color: var(--color-blue-200);">
+              <option value="" disabled>Pilih menu</option>
+              <option v-for="menu in menus" :key="menu.id" :value="menu.id">{{ menu.name }}</option>
+            </select>
+            <input v-model="newPack.label" placeholder="Label (Medium/Large)" class="rounded-lg border px-2 py-1.5 text-xs font-semibold outline-none" style="border-color: var(--color-blue-200);" />
+            <input type="number" v-model.number="newPack.sizePcs" placeholder="30" class="w-16 rounded-lg border px-2 py-1.5 text-xs font-semibold outline-none text-center" style="border-color: var(--color-blue-200);" />
+            <div class="flex items-center gap-1">
+              <span class="text-[10px] font-semibold" style="color: var(--color-ink-500);">Rp</span>
+              <input type="number" v-model.number="newPack.price" placeholder="63000" class="w-20 rounded-lg border px-2 py-1.5 text-xs font-semibold outline-none" style="border-color: var(--color-blue-200);" />
+            </div>
+            <button class="rounded-lg px-3 py-1.5 text-xs font-bold text-white active:scale-90" style="background: var(--color-green-500);" @click="saveNewPack()">Simpan Pack</button>
+          </div>
+        </div>
+
         <div class="space-y-1">
           <div v-for="pack in supplierPacks" :key="pack.id"
             class="flex items-center gap-2 rounded-lg px-2 py-2" style="border-bottom: 1px solid var(--color-blue-50);">

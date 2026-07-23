@@ -19,7 +19,7 @@ app/
 ├── composables/           # 2 composables
 │   ├── usePurchaseOptimizer.ts  # Wraps optimizer.ts
 │   └── usePwaAuth.ts            # PIN cookie auth
-├── data/seed.ts           # TS seed data (dual with server/db/seed.sql)
+├── data/seed.ts           # TS seed data
 ├── middleware/             # Client-side auth guard
 │   └── auth.global.ts     # Redirects to /login if no cookie
 ├── pages/                 # 4 file-based routes
@@ -62,4 +62,4 @@ app/
 - **`$fetch<any>` in stores** — `po.ts` and `inventory.ts` (4 call sites) skip response typing. Server returns untyped rows.
 - **Constants in types.ts** — `PORSI_PCS` mixed into domain interfaces.
 - **POManager.vue 724 lines** — share modal duplicates `InvoiceImage.vue`; customer card should extract; logic belongs in store.
-- **Dual seed sources** — `data/seed.ts` (active) + `server/db/seed.sql` (dead). Delete the SQL file.
+- **Seed source** — `data/seed.ts` only (SQL seed deleted).

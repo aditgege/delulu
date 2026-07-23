@@ -49,8 +49,8 @@ const emojis: Record<string, string> = {
   'paket-halu': '🌟', 'paket-when-ya': '✨', 'paket-solulu': '🌈',
 }
 
-// SKUs available for bakar/kukus (exclude goreng/rebus categories)
-const availableMenus = computed(() => pkgStore.getAllMenus().filter(m => m.category !== 'goreng' && m.category !== 'rebus'))
+// All 9 core menus available for bakar/kukus
+const availableMenus = computed(() => pkgStore.getAllMenus())
 
 watch(activeOrders, (orders) => {
   if (orders.length > 0 && !selectedPoId.value) {

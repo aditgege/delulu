@@ -41,7 +41,7 @@ delulul/
 | DB connection | `server/utils/db.ts` | Neon serverless singleton |
 | Domain glossary | `CONTEXT.md` | Business terms & pricing rules |
 | Types | `app/types.ts` | All domain interfaces |
-| Seed data | `app/data/seed.ts` | TS seed (server/db/seed.sql is dead) |
+| Seed data | `app/data/seed.ts` | TS seed (SQL seed deleted) |
 | Tests | `app/utils/optimizer.test.ts` | Only test file (7 tests) |
 
 ## CONVENTIONS
@@ -64,7 +64,7 @@ delulul/
 - **RED-marked bugs** — 3 known optimizer bugs tracked in tests (cap-50 truncation, hardcoded mix/pkg IDs).
 - **POManager.vue 724 lines** — share modal duplicates `InvoiceImage.vue`; customer card should extract; logic belongs in store.
 - **`.env` committed** — live Neon credentials in repo.
-- **`CaraMasakId` includes `'goreng'`** — stale type; CONTEXT.md says goreng/rebus removed.
+- **`CaraMasakId` cleaned** — `'goreng'` removed, only `'bakar' | 'kukus'`.
 
 ## UNIQUE STYLES
 
